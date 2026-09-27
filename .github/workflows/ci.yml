@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"        # chaque lundi : détecte un changement du schéma de l'API de la CFTC
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]           # 22 = version de production (Render), 24 = version suivante
+    env:
+      SKIP_LIVE: ${{ github.event_name != 'schedule' && '1' || '' }}   # les tests réseau ne tournent que le lundi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  live-schema:
+    name: Schéma CFTC en ligne
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test test/cftc.test.js

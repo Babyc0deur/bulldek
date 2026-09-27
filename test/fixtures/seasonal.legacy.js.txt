@@ -1,0 +1,167 @@
+async function renderSeasonal(m, root) {
+  const B = BD, $ = s => root.querySelector(s);
+  let daily;
+  try { daily = await B.daily(m.code); if (!daily || daily.length < 300) throw 0; }
+  catch { $('#msg').className = 'err'; $('#msg').textContent = 'Prix indisponibles pour ce marché pour le moment. Réessayez dans une minute.'; return; }
+
+  // ---- préparation des données (UTC) ----
+  const D = daily.map(([t, c]) => { const d = new Date(t * 1e3); return { y: d.getUTCFullYear(), m: d.getUTCMonth(), day: d.getUTCDate(), d, c }; });
+  const lastM = {}, byY = {}, byYM = {};
+  D.forEach(p => { lastM[p.y * 12 + p.m] = p.c; (byY[p.y] ||= []).push(p); (byYM[p.y * 12 + p.m] ||= []).push(p); });
+  const now = new Date(), CY = now.getUTCFullYear(), CM = now.getUTCMonth(), CD = now.getUTCDate();
+  const isLeap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const doy = (y, mo, d) => { let i = Math.floor((Date.UTC(y, mo, d) - Date.UTC(y, 0, 1)) / 864e5); if (isLeap(y)) i = i === 59 ? 58 : i > 59 ? i - 1 : i; return Math.min(i, 364); };
+  const MS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334], DM = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const years = Object.keys(byY).map(Number).filter(y => y < CY && byY[y].length > 200).sort((a, b) => a - b);
+  const lastClose = D.at(-1).c, digits = lastClose < 10 ? 4 : lastClose < 1000 ? 2 : 1;
+  const fmt = v => B.dec(v, digits);
+
+  function fill(arr, upTo) { let last = 0; for (let i = 0; i < arr.length; i++) { if (arr[i] == null) { if (upTo != null && i > upTo) arr[i] = null; else arr[i] = last; } else last = arr[i]; } return arr; }
+  function yearCurve(y) {
+    const base = lastM[(y - 1) * 12 + 11] ?? byY[y][0].c, c = new Array(365).fill(null); let upTo = null;
+    byY[y].forEach(p => { const i = doy(y, p.m, p.day); c[i] = p.c - base; upTo = i; });
+    return fill(c, y === CY ? upTo : null);
+  }
+  function avg(curves) { return curves[0].map((_, i) => curves.reduce((s, c) => s + c[i], 0) / curves.length); }
+  function monthCurve(y, mo, upTo) {
+    const base = lastM[y * 12 + mo - 1]; if (base == null || !byYM[y * 12 + mo]) return null;
+    const c = new Array(DM[mo]).fill(null); let last = null;
+    byYM[y * 12 + mo].forEach(p => { if (p.day - 1 < c.length) { c[p.day - 1] = p.c - base; last = p.day - 1; } });
+    return fill(c, y === CY && mo === CM ? last : upTo);
+  }
+  const chg = (y, mo) => { const a = lastM[y * 12 + mo], b = lastM[y * 12 + mo - 1]; return a == null || b == null ? null : { pts: a - b, pct: (a - b) / b * 100 }; };
+
+  const PER = [[20, '#e8b23a'], [15, '#ff7a45'], [10, '#a548e8'], [5, '#4da3ff'], [2, '#3ddc97']];
+  const curves = {}; years.forEach(y => curves[y] = yearCurve(y));
+  const avgYear = n => { const ys = years.slice(-n); return ys.length ? avg(ys.map(y => curves[y])) : null; };
+  const ytd = byY[CY] ? yearCurve(CY) : null;
+
+  // ---- textes ----
+  const avgMonth = (n, mo, key = 'pts') => { const v = years.slice(-n).map(y => chg(y, mo)).filter(Boolean).map(c => c[key]); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const a10 = avgMonth(10, CM), mname = B.MONTHS_L[CM];
+  const sentence = `En moyenne sur les 10 dernières années, le ${m.name} a varié de <b>${fmt(a10)}</b> en ${mname}.`;
+  B.setInfo(`<p>Les tendances saisonnières du <b>${m.name}</b> reposent sur le contrat future. Le rapport présente la saisonnalité sur les 20, 15, 10, 5 et 2 dernières années et montre comment le marché évolue à certaines périodes de l'année ou de la semaine dans un mois.</p>
+    <p>${sentence}</p>
+    <p>Repérez le mois le plus haussier ou le plus baissier de l'année et adaptez votre positionnement. Les données sont recalculées automatiquement à chaque nouvelle année complète. La saisonnalité est plus fiable combinée à l'analyse fondamentale.</p>`);
+
+  // ---- gabarit ----
+  const chips = PER.map(([n, c]) => `<button class="chip ${[10, 5, 2].includes(n) ? 'on' : ''}" data-n="${n}" style="--c:${c}"><i></i>${n} ans</button>`).join('')
+    + `<button class="chip on" data-n="ytd" style="--c:#ffffff"><i></i>${CY}</button>`;
+  root.innerHTML = `
+   <div class="sechead"><h2 class="sec">Saisonnalité annuelle – ${m.name}</h2></div>
+   <div class="card"><div class="leg"><div class="chips" id="chipsY">${chips}</div>
+     <div class="legkey"><span><i></i>Mois en cours</span><span><i class="d"></i>Jour en cours</span></div></div><canvas id="cYear"></canvas></div>
+
+   <div class="sechead"><h2 class="sec">Saisonnalité de ${mname}</h2></div>
+   <div class="g21">
+     <div class="card"><div class="leg"><div class="chips" id="chipsM">${PER.filter(p => [10, 5, 2].includes(p[0])).map(([n, c]) => `<button class="chip on" data-n="${n}" style="--c:${c}"><i></i>${n} ans</button>`).join('')}<button class="chip on" data-n="cur" style="--c:#ffffff"><i></i>${mname} ${CY}</button></div>
+     <div class="legkey"><span><i class="d"></i>Jour en cours</span></div></div><canvas id="cMonth"></canvas></div>
+     <div class="kpis vert" id="kpis"></div>
+   </div>
+
+   <div class="sechead"><h2 class="sec">Variations mensuelles</h2>
+     <div class="ranges" id="unit"><button class="btn on" data-u="pts">Points</button><button class="btn" data-u="pct">%</button></div></div>
+   <div class="g21">
+     <div class="card"><div class="tw"><table class="mon" id="tbl"></table></div></div>
+     <div class="card"><h3>Variation moyenne par mois – 10 ans</h3><canvas id="cMBars"></canvas></div>
+   </div>
+
+   <div class="sechead"><h2 class="sec">Semaines et jours – ${mname}</h2></div>
+   <div class="g2 top">
+     <div class="col">
+       <div class="card"><h3>Variations par semaine</h3><div class="tw"><table class="mon" id="wtbl" style="min-width:480px"></table></div></div>
+       <div class="card"><h3>Variation moyenne par jour – 10 ans</h3><canvas id="cDay"></canvas></div>
+     </div>
+     <div class="card fill"><h3>Variations journalières</h3><div class="tw scroll"><table class="mon" id="dtbl" style="min-width:420px"></table></div></div>
+   </div>
+   <p class="note">Variation mensuelle = clôture de fin de mois − clôture du mois précédent, moyennée sur les années complètes. Courbes annuelles = évolution cumulée depuis la dernière clôture de l'année précédente, moyennée sur la période. Mise à jour automatique.</p>`;
+
+  // ---- graphique annuel ----
+  const dayLabel = i => { let mo = 11; while (MS[mo] > i) mo--; return `${i - MS[mo] + 1} ${B.MONTHS[mo].toLowerCase()}`; };
+  const xt = MS.map((v, i) => [v, B.MONTHS[i]]);
+  const onY = new Set([10, 5, 2, 'ytd']);
+  const monthBand = { x0: MS[CM], x1: MS[CM] + DM[CM], color: 'rgba(232,178,58,.12)' }, today = { x: doy(CY, CM, CD), color: '#ff3b3b' };
+  const cy = B.lineChart($('#cYear'), { series: [], xmin: 0, xmax: 364, xTicks: xt, yFmt: v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : +v.toFixed(2), tipHead: dayLabel, tipFmt: fmt, bands: [monthBand], vlines: [today], height: 400 });
+  function paintYear() {
+    const s = PER.filter(([n]) => onY.has(n)).map(([n, c]) => ({ name: n + ' ans', color: c, width: 1.8, data: (avgYear(n) || []).map((v, i) => [i, v]) }));
+    if (onY.has('ytd') && ytd) s.push({ name: String(CY), color: '#ffffff', width: 1.6, dash: [5, 4], data: ytd.map((v, i) => v == null ? null : [i, v]).filter(Boolean) });
+    cy.redraw({ series: s });
+  }
+  $('#chipsY').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; const n = b.dataset.n === 'ytd' ? 'ytd' : +b.dataset.n; onY.has(n) ? onY.delete(n) : onY.add(n); b.classList.toggle('on'); paintYear(); };
+  paintYear();
+
+  // ---- graphique du mois ----
+  const onM = new Set([10, 5, 2, 'cur']);
+  const mcur = monthCurve(CY, CM);
+  const cm = B.lineChart($('#cMonth'), { series: [], xmin: 1, xmax: DM[CM], xTicks: Array.from({ length: DM[CM] }, (_, i) => [i + 1, String(i + 1)]).filter(t => t[0] % 2 === 1),
+    yFmt: v => +v.toFixed(2), tipHead: x => `${x} ${B.MONTHS[CM].toLowerCase()}`, tipFmt: fmt, vlines: [{ x: Math.min(CD, DM[CM]), color: '#ff3b3b' }], height: 300 });
+  function paintMonth() {
+    const s = PER.filter(([n]) => onM.has(n)).map(([n, c]) => {
+      const cs = years.slice(-n).map(y => monthCurve(y, CM)).filter(Boolean);
+      return { name: n + ' ans', color: c, width: 1.8, data: cs.length ? avg(cs).map((v, i) => [i + 1, v]) : [] };
+    });
+    if (onM.has('cur') && mcur) s.push({ name: `${B.MONTHS[CM]} ${CY}`, color: '#ffffff', width: 1.6, dash: [5, 4], data: mcur.map((v, i) => v == null ? null : [i + 1, v]).filter(Boolean) });
+    cm.redraw({ series: s });
+  }
+  $('#chipsM').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; const n = b.dataset.n === 'cur' ? 'cur' : +b.dataset.n; onM.has(n) ? onM.delete(n) : onM.add(n); b.classList.toggle('on'); paintMonth(); };
+  paintMonth();
+
+  // ---- KPIs du mois ----
+  const monthSoFar = mcur ? mcur.filter(v => v != null).at(-1) : null;
+  const up10 = years.slice(-10).map(y => chg(y, CM)).filter(Boolean), upN = up10.filter(c => c.pts > 0).length;
+  const kp = (l, v, cls = '') => `<div class="kpi"><span>${l}</span><b class="${cls}">${v}</b></div>`;
+  const cl = v => v == null ? '' : v >= 0 ? 'pos' : 'neg';
+  $('#kpis').innerHTML = [10, 5, 2].map(n => { const v = avgMonth(n, CM); return kp(`Moyenne ${n} ans`, v == null ? '–' : fmt(v), cl(v)); }).join('')
+    + kp('Ce mois-ci', monthSoFar == null ? '–' : fmt(monthSoFar), cl(monthSoFar)) + kp(`Hausse en ${mname} (10 a.)`, `${upN}/${up10.length}`);
+
+  // ---- tableau mensuel + barres ----
+  let unit = 'pts';
+  const cells = n => Array.from({ length: 12 }, (_, mo) => avgMonth(n, mo, unit));
+  const f2 = v => v == null ? '–' : unit === 'pct' ? B.dec(v, 2) + '%' : fmt(v);
+  function paintTable() {
+    $('#tbl').innerHTML = `<thead><tr><th>Période</th>${B.MONTHS.map((x, i) => `<th class="${i === CM ? 'cur' : ''}">${x}</th>`).join('')}</tr></thead><tbody>`
+      + PER.map(([n]) => `<tr><td>${n} ans</td>${cells(n).map((v, i) => `<td class="${(v == null ? '' : v >= 0 ? 'pos' : 'neg')} ${i === CM ? 'cur' : ''}">${f2(v)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+    B.bars($('#cMBars'), cells(10).map((v, i) => ({ label: B.MONTHS[i], v: v || 0, color: (v || 0) >= 0 ? '#0f8a55' : '#b3202f' })), 210, false);
+  }
+  // Variation par semaine du mois en cours : blocs 1-7, 8-14, 15-21, 22-28, 29-fin.
+  function paintWeeks() {
+    const dm = DM[CM], blocks = []; for (let st = 1; st <= dm; st += 7) blocks.push([st, Math.min(st + 6, dm)]);
+    const weekVals = (c, base, lastDay) => blocks.map(([a, e], k) => {
+      if (lastDay < a) return null;
+      const end = c[Math.min(e, lastDay) - 1], start = k ? c[blocks[k - 1][1] - 1] : 0, d = end - start;
+      return unit === 'pct' ? d / base * 100 : d;
+    });
+    const avgW = n => {
+      const acc = blocks.map(() => []);
+      years.slice(-n).forEach(y => { const c = monthCurve(y, CM); if (!c) return; weekVals(c, lastM[y * 12 + CM - 1], c.length).forEach((v, k) => v != null && acc[k].push(v)); });
+      return acc.map(a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    };
+    const curWk = blocks.findIndex(([a, e]) => CD >= a && CD <= e);
+    const cls = (v, k) => `${v == null ? '' : v >= 0 ? 'pos' : 'neg'} ${k === curWk ? 'cur' : ''}`;
+    let cur = null;
+    if (mcur) { const last = mcur.filter(v => v != null).length; cur = weekVals(mcur, lastM[CY * 12 + CM - 1], last); }
+    $('#wtbl').innerHTML = `<thead><tr><th>Période</th>${blocks.map(([a, e], k) => `<th class="${k === curWk ? 'cur' : ''}">Sem. ${k + 1}<br><small>${a}–${e} ${B.MONTHS[CM].toLowerCase()}</small></th>`).join('')}</tr></thead><tbody>`
+      + PER.map(([n]) => `<tr><td>${n} ans</td>${avgW(n).map((v, k) => `<td class="${cls(v, k)}">${f2(v)}</td>`).join('')}</tr>`).join('')
+      + (cur ? `<tr><td>${CY}</td>${cur.map((v, k) => `<td class="${cls(v, k)}">${f2(v)}${k === curWk && v != null ? ' <small>(en cours)</small>' : ''}</td>`).join('')}</tr>` : '') + '</tbody>';
+  }
+  // Variation journalière : clôture du jour − clôture de la séance précédente, regroupée par jour du mois.
+  const dayChg = {};
+  for (let i = 1; i < D.length; i++) { const p = D[i], k = p.y * 12 + p.m; ((dayChg[k] ||= {})[p.day] = { pts: p.c - D[i - 1].c, pct: (p.c / D[i - 1].c - 1) * 100 }); }
+  function paintDays() {
+    const dm = DM[CM], key = unit === 'pct' ? 'pct' : 'pts';
+    const avgD = n => Array.from({ length: dm }, (_, i) => {
+      const v = years.slice(-n).map(y => dayChg[y * 12 + CM]?.[i + 1]?.[key]).filter(x => x != null);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    });
+    const cols = PER.map(([n]) => avgD(n)), cur = Array.from({ length: dm }, (_, i) => dayChg[CY * 12 + CM]?.[i + 1]?.[key] ?? null);
+    const c = v => v == null ? '' : v >= 0 ? 'pos' : 'neg';
+    $('#dtbl').innerHTML = `<thead><tr><th>Jour</th>${PER.map(([n]) => `<th>${n} ans</th>`).join('')}<th>${CY}</th></tr></thead><tbody>`
+      + Array.from({ length: dm }, (_, i) => `<tr class="${i + 1 === CD ? 'cur' : ''}"><td>${i + 1} ${B.MONTHS[CM].toLowerCase()}</td>${cols.map(col => `<td class="${c(col[i])} ${i + 1 === CD ? 'cur' : ''}">${f2(col[i])}</td>`).join('')}<td class="${c(cur[i])} ${i + 1 === CD ? 'cur' : ''}">${f2(cur[i])}</td></tr>`).join('') + '</tbody>';
+    const b10 = cols[2];
+    B.bars($('#cDay'), b10.map((v, i) => ({ label: String(i + 1), v: v || 0, color: (v || 0) >= 0 ? '#0f8a55' : '#b3202f' })), 200, false);
+  }
+  $('#unit').onclick = e => { const b = e.target.closest('button'); if (!b) return; unit = b.dataset.u; [...$('#unit').children].forEach(x => x.classList.toggle('on', x === b)); paintTable(); paintWeeks(); paintDays(); };
+  paintTable(); paintWeeks(); paintDays();
+  addEventListener('resize', () => paintDays());
+  addEventListener('resize', () => B.bars($('#cMBars'), cells(10).map((v, i) => ({ label: B.MONTHS[i], v: v || 0, color: (v || 0) >= 0 ? '#0f8a55' : '#b3202f' })), 210, false));
+}

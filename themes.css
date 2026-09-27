@@ -1,0 +1,49 @@
+/* Chartes graphiques proposées. Chaque thème redéfinit les mêmes variables que shared.css : appliqué à un conteneur (aperçu /themes)
+   ou à <html data-theme="…"> (site entier), il recolore toutes les briques existantes. Polices : piles système uniquement (aucune police tierce). */
+
+/* 1. PAPIER — éditorial clair, encre sur papier crème, accent vert profond, titres à empattements */
+[data-theme="papier"]{--bg:#f5f1e8;--bg2:#ece6d8;--panel:#fffdf8;--line:#d8cfbd;--text:#1f1d1a;--muted:#5a5448;--accent:#1f6f54;--gold:#8a5a00;
+  --red:#a4262c;--redl:#b3202f;--green:#0b6b3a;--greenl:#086b34;--blue:#1c4f9c;--bluel:#1d5fbf;--purple:#6b3fa0;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-head:Georgia,"Times New Roman",Times,serif;--radius:6px;--logo-weight:700}
+
+/* 2. TERMINAL — phosphore ambre sur noir, tout en chasse fixe */
+[data-theme="terminal"]{--bg:#0a0a08;--bg2:#15140e;--panel:#100f0b;--line:#3d3720;--text:#f2dda6;--muted:#b89f62;--accent:#ffb000;--gold:#ffd166;
+  --red:#a83a30;--redl:#ff6b5e;--green:#3f7d20;--greenl:#9be564;--blue:#2d6a8f;--bluel:#6cc9ff;--purple:#c28cff;
+  --font-body:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;--font-head:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;--radius:2px;--logo-weight:700}
+
+/* 3. NORDIQUE — clair et froid, sobre et lisible, accent sarcelle */
+[data-theme="nordique"]{--bg:#f3f6fa;--bg2:#e6edf5;--panel:#ffffff;--line:#d3deeb;--text:#0f2340;--muted:#45597a;--accent:#0b7285;--gold:#8a5a00;
+  --red:#b42318;--redl:#b42318;--green:#067647;--greenl:#067647;--blue:#175cd3;--bluel:#175cd3;--purple:#6941c6;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--radius:10px;--logo-weight:800}
+
+/* 4. GRAPHITE — sombre neutre, gris anthracite, accent vert */
+[data-theme="graphite"]{--bg:#121417;--bg2:#1a1d21;--panel:#171a1e;--line:#2f353c;--text:#e7eaee;--muted:#98a2ae;--accent:#4ade80;--gold:#e3b341;
+  --red:#8e2b2b;--redl:#ff7b72;--green:#1f6f3a;--greenl:#56d364;--blue:#1f4f8f;--bluel:#79c0ff;--purple:#b392f0;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--radius:8px;--logo-weight:800}
+
+/* 5. INDIGO — clair et vif, blanc cassé, accent indigo */
+[data-theme="indigo"]{--bg:#f7f7fc;--bg2:#eceefa;--panel:#ffffff;--line:#d9dcf2;--text:#1b1b3a;--muted:#4a4d7a;--accent:#4a2fd6;--gold:#8a5a00;
+  --red:#b42318;--redl:#b42318;--green:#067647;--greenl:#067647;--blue:#1d4ed8;--bluel:#1d4ed8;--purple:#7a3fc4;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-head:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--radius:14px;--logo-weight:800}
+
+/* Thème actuel (rappel, pour comparer) */
+[data-theme="actuel"]{--bg:#050a24;--bg2:#0a1235;--panel:#070d2c;--line:#22305f;--text:#e8ecf8;--muted:#8f9bc0;--accent:#ff9a1f;--gold:#e8b23a;
+  --red:#8a1f35;--redl:#ff5c72;--green:#0f5a3a;--greenl:#3ddc97;--blue:#2c3f9a;--bluel:#4da3ff;--purple:#a548e8;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-head:inherit;--radius:16px;--logo-weight:800}
+
+/* Aperçu : un conteneur par thème (mise en page de la page /themes uniquement) */
+.theme-demo{background:var(--bg);color:var(--text);font-family:var(--font-body);border:1px solid var(--line);border-radius:calc(var(--radius) + 6px);padding:22px;margin:0 0 26px}
+.theme-demo h2{font-family:var(--font-head);font-size:1.5rem;margin:14px 0 6px;color:var(--text);border:0;padding:0}
+.theme-demo h2 small{font-size:.85rem;font-weight:400;color:var(--muted);margin-left:8px}
+.theme-demo .logo{font-weight:300;font-size:1.3rem;letter-spacing:.04em;color:var(--text)}.theme-demo .logo b{font-weight:var(--logo-weight)}
+.td-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.td-nav{color:var(--muted);font-size:.88rem}
+.td-desc{color:var(--muted);max-width:760px;margin:0 0 14px;font-size:.95rem}
+.td-sw{list-style:none;display:flex;flex-wrap:wrap;gap:10px 16px;margin:0 0 16px}
+.td-sw li{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted);line-height:1.2}.td-sw small{color:var(--text);font-family:ui-monospace,Consolas,monospace}
+.sw-c{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);flex:none}
+.td-k{margin-bottom:12px}
+.td-row{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;margin:0 0 14px}
+.td-row .sig{margin:0}.td-chip{--c:var(--accent)}
+.theme-demo .card canvas{width:100%}
+@media(min-width:1100px){#demos{display:block}}

@@ -1,0 +1,7 @@
+{
+  "name": "bulldesk",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node --disable-warning=ExperimentalWarning server.js", "test": "node --test", "check:release": "node tools/check-release.js" },
+  "engines": { "node": ">=20" }
+}

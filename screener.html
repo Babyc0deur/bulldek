@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screener – COT, Williams %R et saisonnalité | BullDesk</title>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/themes.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top"><div class="wrap bar">
+  <a class="logo" href="/">BULL<b>DESK</b></a>
+  <ul class="jump"><li><a href="/screener" class="cur-page">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li></ul>
+</div></header>
+<main id="contenu">
+<div class="wrap pagehead">
+  <h1>Screener – 37 marchés</h1>
+  <p class="scr-sub">COT Index des commerciaux, Williams %R 14 jours, saisonnalité du mois et open interest, réunis en une <b>confluence</b> de −4 à +4. Cliquez sur un marché pour ouvrir sa fiche.</p>
+</div>
+<div class="wrap">
+  <div class="fresh-wrap" id="fresh"></div>
+  <div class="scr-bar">
+    <input id="q" class="btn" type="search" placeholder="Rechercher un actif…" aria-label="Rechercher">
+    <select id="grp" class="btn" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
+    <select id="bias" class="btn" aria-label="Biais">
+      <option value="">Tous les biais</option><option value="bull">Haussiers (≥ +2)</option><option value="bear">Baissiers (≤ −2)</option><option value="mixed">Mixtes</option>
+    </select>
+    <span id="upd" class="scr-upd"></span>
+  </div>
+  <div class="card"><div class="tw scr-wrap"><table class="mon scr" id="tbl"><tbody><tr><td>Chargement…</td></tr></tbody></table></div></div>
+  <div class="card scr-rules">
+    <h3>Lecture des signaux</h3>
+    <ul>
+      <li><b>COT</b> (index 6 mois des commerciaux) : ≥ 80 % <span class="pos">haussier</span> · ≤ 20 % <span class="neg">baissier</span> · sinon neutre.</li>
+      <li><b>Saison</b> (variation moyenne du mois en cours sur 10 ans) : haussière si moyenne &gt; 0 et au moins 60 % d'années positives ; baissière dans le cas inverse ; sinon neutre.</li>
+      <li><b>Open interest</b> (prix du mardi et open interest de la semaine) : <span class="pos">haussier</span> si les deux montent (hausse confirmée), <span class="neg">baissier</span> si le prix baisse et l'open interest monte (baisse confirmée), sinon neutre.</li>
+      <li><b>Williams %R</b> (14 jours) : &lt; −80 survente (<span class="pos">haussier</span>) · &gt; −20 surachat (<span class="neg">baissier</span>) · sinon neutre.</li>
+      <li><b>Confluence</b> = somme des quatre signaux : ≥ +2 haussière, ≤ −2 baissière, entre les deux mixte. Avec quatre signaux, deux qui concordent suffisent à atteindre ±2.</li>
+    </ul>
+    <p class="note tight">Repères pédagogiques calculés automatiquement, pas des conseils en investissement. Les performances passées ne préjugent pas des performances futures.</p>
+  </div>
+</div>
+</main>
+<footer class="f"><div class="wrap">
+  <nav class="fnav" aria-label="Informations"><a href="/a-propos">À propos et méthodologie</a></nav>
+  <p>Sources : CFTC (rapport Legacy, futures uniquement) et Yahoo Finance (futures continus). Mise à jour automatique.</p>
+</div></footer>
+<script src="/shared.js"></script>
+<script src="/calc.js"></script>
+<script src="/screener.js"></script>
+</body>
+</html>

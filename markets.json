@@ -1,0 +1,335 @@
+[
+ {
+  "group": "Indices",
+  "slug": "sp500",
+  "name": "S&P 500 E-Mini",
+  "code": "13874A",
+  "yahoo": "ES=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Indices",
+  "slug": "nasdaq-100",
+  "name": "Nasdaq 100 E-Mini",
+  "code": "209742",
+  "yahoo": "NQ=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Indices",
+  "slug": "dow-jones",
+  "name": "Dow Jones 30 E-Mini",
+  "code": "124603",
+  "yahoo": "YM=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Indices",
+  "slug": "russell-2000",
+  "name": "Russell 2000 E-Mini",
+  "code": "239742",
+  "yahoo": "RTY=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "us-dollar",
+  "name": "US Dollar (USD)",
+  "code": "098662",
+  "yahoo": "DX-Y.NYB",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "euro-fx",
+  "name": "Euro Fx (EUR)",
+  "code": "099741",
+  "yahoo": "6E=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "british-pound",
+  "name": "British Pound (GBP)",
+  "code": "096742",
+  "yahoo": "6B=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "japanese-yen",
+  "name": "Japanese Yen (JPY)",
+  "code": "097741",
+  "yahoo": "6J=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "canadian-dollar",
+  "name": "Canadian Dollar (CAD)",
+  "code": "090741",
+  "yahoo": "6C=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "swiss-franc",
+  "name": "Swiss Franc (CHF)",
+  "code": "092741",
+  "yahoo": "6S=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "australian-dollar",
+  "name": "Australian Dollar (AUD)",
+  "code": "232741",
+  "yahoo": "6A=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Currencies",
+  "slug": "new-zealand-dollar",
+  "name": "New Zealand Dollar (NZD)",
+  "code": "112741",
+  "yahoo": "6N=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Crypto",
+  "slug": "bitcoin",
+  "name": "Bitcoin (CME)",
+  "code": "133741",
+  "yahoo": "BTC=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Bonds",
+  "slug": "30-year-t-bond",
+  "name": "30-Year T-Bond",
+  "code": "020601",
+  "yahoo": "ZB=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Bonds",
+  "slug": "10-year-t-note",
+  "name": "10-Year T-Note",
+  "code": "043602",
+  "yahoo": "ZN=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Bonds",
+  "slug": "5-year-t-note",
+  "name": "5-Year T-Note",
+  "code": "044601",
+  "yahoo": "ZF=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Bonds",
+  "slug": "2-year-t-note",
+  "name": "2-Year T-Note",
+  "code": "042601",
+  "yahoo": "ZT=F",
+  "tff": true,
+  "disagg": false
+ },
+ {
+  "group": "Energy",
+  "slug": "crude-oil",
+  "name": "Crude Oil",
+  "code": "067651",
+  "yahoo": "CL=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Energy",
+  "slug": "heating-oil",
+  "name": "Heating Oil",
+  "code": "022651",
+  "yahoo": "HO=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Energy",
+  "slug": "gasoline-rbob",
+  "name": "Gasoline RBOB",
+  "code": "111659",
+  "yahoo": "RB=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Energy",
+  "slug": "natural-gas",
+  "name": "Natural Gas",
+  "code": "023651",
+  "yahoo": "NG=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Metals",
+  "slug": "gold",
+  "name": "Gold",
+  "code": "088691",
+  "yahoo": "GC=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Metals",
+  "slug": "silver",
+  "name": "Silver",
+  "code": "084691",
+  "yahoo": "SI=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Metals",
+  "slug": "copper",
+  "name": "Copper",
+  "code": "085692",
+  "yahoo": "HG=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Metals",
+  "slug": "platinum",
+  "name": "Platinum",
+  "code": "076651",
+  "yahoo": "PL=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Metals",
+  "slug": "palladium",
+  "name": "Palladium",
+  "code": "075651",
+  "yahoo": "PA=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Grains",
+  "slug": "wheat",
+  "name": "Wheat SRW",
+  "code": "001602",
+  "yahoo": "ZW=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Grains",
+  "slug": "corn",
+  "name": "Corn",
+  "code": "002602",
+  "yahoo": "ZC=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Grains",
+  "slug": "soybeans",
+  "name": "Soybeans",
+  "code": "005602",
+  "yahoo": "ZS=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Grains",
+  "slug": "soybean-meal",
+  "name": "Soybean Meal",
+  "code": "026603",
+  "yahoo": "ZM=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Grains",
+  "slug": "soybean-oil",
+  "name": "Soybean Oil",
+  "code": "007601",
+  "yahoo": "ZL=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Softs",
+  "slug": "cotton",
+  "name": "Cotton",
+  "code": "033661",
+  "yahoo": "CT=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Softs",
+  "slug": "coffee",
+  "name": "Coffee",
+  "code": "083731",
+  "yahoo": "KC=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Softs",
+  "slug": "sugar",
+  "name": "Sugar",
+  "code": "080732",
+  "yahoo": "SB=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Softs",
+  "slug": "cocoa",
+  "name": "Cocoa",
+  "code": "073732",
+  "yahoo": "CC=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Livestock",
+  "slug": "live-cattle",
+  "name": "Live Cattle",
+  "code": "057642",
+  "yahoo": "LE=F",
+  "tff": false,
+  "disagg": true
+ },
+ {
+  "group": "Livestock",
+  "slug": "lean-hogs",
+  "name": "Lean Hogs",
+  "code": "054642",
+  "yahoo": "HE=F",
+  "tff": false,
+  "disagg": true
+ }
+]

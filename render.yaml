@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: bulldesk
+    runtime: node
+    plan: free
+    buildCommand: echo "rien à construire"
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # SQLite intégré à Node (node:sqlite) : Node 22.13 minimum. Sans lui, le serveur se replie sur un fichier JSON.
+      - key: NODE_VERSION
+        value: "22"
+      - key: REFRESH_HOURS
+        value: "6"
+      # Render place un proxy devant le serveur : sans cette valeur, tous les visiteurs partageraient le même
+      # compteur de limite de débit. 1 = un proxy de confiance (celui de Render).
+      - key: TRUST_PROXY
+        value: "1"
+      - key: RATE_API
+        value: "120"        # requêtes /api par minute et par visiteur
+      - key: RATE_WEB
+        value: "300"        # pages et fichiers par minute et par visiteur

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>À propos et méthodologie | BullDesk</title>
+<meta name="description" content="D'où viennent les données de BullDesk, comment sont calculés le COT Index, le Williams %R, la saisonnalité et la confluence, et quelles sont les limites de ces indicateurs.">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/themes.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top"><div class="wrap bar">
+  <a class="logo" href="/">BULL<b>DESK</b></a>
+  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li><li><a href="/a-propos" class="cur-page">À propos</a></li></ul>
+</div></header>
+<main id="contenu">
+<div class="wrap doc">
+  <h1>À propos et méthodologie</h1>
+  <p class="lead">BullDesk rassemble sur une seule page, pour chaque marché à terme, quatre lectures classiques : la <b>saisonnalité</b>, le <b>Williams %R</b>, le <b>positionnement des grands acteurs (COT)</b> et l'<b>open interest</b>. Cette page explique d'où viennent les chiffres, comment ils sont calculés, et surtout ce qu'ils ne permettent pas de conclure.</p>
+
+  <nav class="toc" aria-label="Sommaire"><ul>
+    <li><a href="#donnees">D'où viennent les données</a></li><li><a href="#methode">Comment sont calculés les indicateurs</a></li>
+    <li><a href="#fraicheur">L'indicateur de fraîcheur</a></li><li><a href="#limites">Limites à connaître</a></li><li><a href="#perso">Vie privée</a></li>
+  </ul></nav>
+
+  <h2 id="donnees">D'où viennent les données</h2>
+  <div class="tw"><table class="doc-t">
+    <thead><tr><th scope="col">Donnée</th><th scope="col">Source</th><th scope="col">Fréquence</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Positions COT (rapports Legacy, TFF pour les marchés financiers, Disaggregated pour les matières premières), futures uniquement</th>
+        <td>CFTC, autorité américaine des marchés à terme (données publiques)</td>
+        <td>Publication le vendredi à 15h30 (heure de New York) avec les positions du mardi précédent ; décalée d'un jour ouvré quand un jour férié fédéral américain tombe entre le mercredi et le vendredi. Relecture toutes les {{REFRESH_HOURS}} h.</td></tr>
+      <tr><th scope="row">Prix des futures (clôtures, plus hauts, plus bas)</th>
+        <td>Yahoo Finance, contrats continus</td>
+        <td>Prix quotidiens (20 ans d'historique) rafraîchis toutes les 24 h ; prix hebdomadaires (10 ans) toutes les {{REFRESH_HOURS}} h.</td></tr>
+      <tr><th scope="row">Inflation (CPI) et taux d'intérêt de 19 zones</th>
+        <td>OCDE (interface publique SDMX)</td>
+        <td>Données mensuelles, rafraîchies toutes les 24 h. L'OCDE limite fortement le nombre d'appels : en cas d'échec, le site conserve les dernières données et ne retente qu’après 1 heure.</td></tr>
+      <tr><th scope="row">Rendements américains 2, 5, 10 et 30 ans, courbe, taux réel, inflation anticipée, VIX, inflation PCE (et son indice cœur), indice dollar (DXY)</th>
+        <td>FRED, base de données de la Réserve fédérale de Saint-Louis (CSV public)</td>
+        <td>Séries quotidiennes, rafraîchies toutes les 6 h ; certaines ont un ou plusieurs jours de retard (le VIX en particulier), la date des données est toujours indiquée dans le debrief.</td></tr>
+      <tr><th scope="row">Annonces économiques (calendrier, importance, prévision, précédent)</th>
+        <td>Calendrier de Forex Factory (flux public, non officiel)</td>
+        <td>Semaine en cours (et suivante quand elle est publiée), rafraîchi toutes les 3 h. Les heures affichées dans le debrief sont celles de Paris.</td></tr>
+      <tr><th scope="row">Calendrier de publication du COT</th>
+        <td>Calendrier officiel de la CFTC, règle des jours fériés recalculée par le site</td>
+        <td>Vérifié sur les 52 publications de 2026.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Les données sont fournies « en l'état » par ces sources tierces. BullDesk n'est affilié ni à la CFTC, ni à Yahoo, ni à aucune bourse.</p>
+
+  <h2 id="methode">Comment sont calculés les indicateurs</h2>
+
+  <h3>COT Index</h3>
+  <p>On prend la <b>position nette des commerciaux</b> (positions longues moins positions courtes, rapport Legacy). Le <b>COT Index</b> indique où se situe cette position dans sa fourchette minimum–maximum sur les {{COT_SHORT_WEEKS}} dernières semaines (« 6 mois ») ou les {{COT_LONG_WEEKS}} dernières semaines (« 36 mois ») : 0 % = plus bas de la période, 100 % = plus haut.</p>
+  <p><b>Lecture affichée :</b> à {{COT_BUY}} % ou plus, <span class="pos">Achat</span> ; à {{COT_SELL}} % ou moins, <span class="neg">Vente</span> ; entre les deux, <b>Patience</b>. C'est une convention répandue de l'analyse COT (les commerciaux, qui se couvrent, seraient « bien placés » à leurs extrêmes), pas une règle démontrée. Le screener et la confluence utilisent l'indice à 6 mois ; la fiche marché et la comparaison affichent aussi l'indice à 36 mois. Pour les fonds spéculatifs (managed money), l'indice est présenté comme un positionnement (« long extrême », « short extrême ») et non comme un signal.</p>
+
+  <h3>Williams %R</h3>
+  <p>%R = (plus haut des N dernières périodes − clôture) ÷ (plus haut − plus bas des N dernières périodes) × −100, avec N = {{WR_PERIOD}}. La valeur va de −100 à 0. Le site l'affiche sur les séances quotidiennes.</p>
+  <p><b>Zones :</b> au-dessus de {{WR_HIGH}} = <b>surachat</b> (lecture baissière de repli possible) ; en dessous de {{WR_LOW}} = <b>survente</b> (lecture haussière de rebond possible) ; entre les deux, neutre. Les seuils eux-mêmes sont neutres.</p>
+
+  <h3>Saisonnalité</h3>
+  <ul>
+    <li><b>Variation mensuelle</b> : clôture de fin de mois moins clôture de fin du mois précédent, moyennée sur les années complètes (l'année en cours est exclue des moyennes mais affichée à part).</li>
+    <li><b>Courbes annuelles</b> : évolution cumulée depuis la dernière clôture de l'année précédente, moyennée sur les 20, 15, 10, 5 et 2 dernières années. Le 29 février est replié sur le 28 pour aligner les années.</li>
+    <li><b>Semaines et jours</b> : blocs 1-7, 8-14, 15-21, 22-28 et 29-fin du mois ; variation journalière = clôture moins clôture de la séance précédente.</li>
+  </ul>
+  <p><b>Lecture affichée pour le screener et la confluence :</b> variation moyenne de la <b>semaine calendaire en cours</b> (lundi à dimanche, clôture de la veille du lundi contre clôture du dimanche ou de la dernière séance connue avant), aux mêmes dates les {{SEASON_MIN_YEARS}} à 10 années précédentes. Saisonnalité <span class="pos">haussière</span> si cette moyenne sur 10 ans est positive et qu'au moins {{SEASON_HIT_PCT}} % des années sont positives, avec au moins {{SEASON_MIN_YEARS}} années disponibles ; <span class="neg">baissière</span> dans le cas inverse ; sinon neutre.</p>
+
+  <h3>Confluence</h3>
+  <p>Somme des quatre lectures ci-dessus (COT 6 mois, saisonnalité de la semaine, Williams %R quotidien, open interest de la semaine), chacune valant +1, 0 ou −1 : un score de −4 à +4. Un score d'au moins +{{CONF}} est présenté comme <b>haussier</b>, d'au plus −{{CONF}} comme <b>baissier</b>, entre les deux comme <b>mixte</b>. Avec quatre signaux, deux qui concordent suffisent à atteindre ±{{CONF}}. C'est un simple résumé : additionner quatre indicateurs ne crée pas une prévision.</p>
+
+  <h3>Open interest</h3>
+  <p>L'<b>open interest</b> est le nombre total de contrats à terme non dénoués (toutes échéances confondues), publié chaque semaine avec le rapport COT Legacy (futures uniquement). Le site affiche son niveau, ses variations sur 1 et 4 semaines, son écart à la moyenne mobile sur 52 semaines et sa position dans la fourchette des {{COT_LONG_WEEKS}} dernières semaines.</p>
+  <p><b>Lecture affichée :</b> on croise l'évolution du prix (clôture du mardi de chaque rapport) et celle de l'open interest sur la semaine. Prix et open interest en hausse : <b>hausse confirmée</b> (de nouveaux contrats s'ouvrent). Prix en hausse, open interest en baisse : <b>hausse fragile</b> (rachats de positions courtes). Prix en baisse, open interest en hausse : <b>baisse confirmée</b>. Prix et open interest en baisse : <b>baisse par liquidation</b>. Une variation inférieure à {{PRICE_FLAT_PCT}} % pour le prix ou à {{OI_FLAT_PCT}} % pour l'open interest n'est pas interprétée. C'est une convention d'analyse, pas une prévision. Elle entre dans la confluence par un signal : +1 pour une hausse confirmée, −1 pour une baisse confirmée, 0 dans tous les autres cas (hausse fragile, baisse par liquidation, variation trop faible, ou changement de contrat récent qui fausse la variation de prix).</p>
+
+  <h3>Comparaison de deux marchés</h3>
+  <p><b>Performance</b> : dernière clôture rapportée à celle du même jour calendaire de la période (dernière séance antérieure). <b>Corrélation</b> : coefficient de Pearson entre les rendements quotidiens des jours de bourse communs aux deux marchés, sur 63 jours (3 mois), 252 jours (1 an) et 756 jours (3 ans). Elle décrit un mouvement conjoint passé, pas une relation de cause à effet, et change beaucoup avec le temps.</p>
+
+  <h3 id="debrief">Debrief du jour</h3>
+  <p>Chaque fiche commence par un debrief assemblé automatiquement, sans intelligence artificielle : les mêmes indicateurs que le reste du site, mis en phrases. Deux biais sont affichés. <b>Semaine</b> : somme des signaux COT 6 mois, saisonnalité et open interest (de −3 à +3) ; haussière à +2 ou plus, baissière à −2 ou moins, neutre sinon. <b>Journée</b> : signal du Williams %R (14 jours) plus la direction de la dernière séance si elle dépasse ±0,5 % (de −2 à +2) ; haussière à +1 ou plus, baissière à −1 ou moins. Le contexte macro (inflation, taux directeur, tendance sur 3 et 6 mois), les rendements, la courbe, le taux réel, le VIX, l'inflation PCE, l'indice dollar (DXY) et la corrélation glissante du marché avec ces séries sur ses 60 dernières séances (une corrélation est un repère, jamais une relation de cause à effet) et les annonces d'importance moyenne ou forte des 48 prochaines heures, pour les devises du marché, complètent le tableau ; une annonce forte dans les 24 heures est signalée comme point de vigilance. Ces seuils sont des conventions, pas le résultat d'un test rétrospectif.</p>
+
+  <h2 id="fraicheur">L'indicateur de fraîcheur</h2>
+  <p>Sous le titre de chaque fiche, une pastille indique si les données sont <b>à jour</b>, <b>à vérifier</b> ou <b>indisponibles</b>. Elle passe à « à vérifier » quand la dernière séance date de plus de {{STALE_SESSION_DAYS}} jours après sa clôture, quand la dernière mise à jour réussie du site date de plus de {{FETCH_MAX_HOURS}} h, quand un rapport COT n'est pas arrivé {{GRACE_HOURS}} h après son heure officielle de publication, ou quand une mise à jour a échoué. Le compte à rebours de la section COT suit le calendrier officiel, jours fériés compris.</p>
+
+  <h2 id="limites">Limites à connaître</h2>
+  <ul>
+    <li><b>Contrats continus non ajustés.</b> Les prix sont ceux de contrats « continus » qui enchaînent les échéances : au changement de contrat, un saut de prix apparaît sans qu'il y ait eu de vrai mouvement. Un saut de plus de {{ROLL_PCT}} % en une séance dans les {{ROLL_WINDOW}} dernières séances (hors crypto) rend le Williams %R « non fiable » (⚠) et neutralise ce signal. Les courbes de saisonnalité et les corrélations peuvent conserver l'effet d'un saut isolé.</li>
+    <li><b>Source de prix non officielle.</b> Yahoo Finance peut être en retard, incomplet ou indisponible sans préavis.</li>
+    <li><b>Des conventions, pas des résultats démontrés.</b> Les seuils (COT {{COT_SELL}}/{{COT_BUY}} %, Williams %R {{WR_LOW}}/{{WR_HIGH}}, {{SEASON_HIT_PCT}} % d'années) sont des usages courants. <b>Ils n'ont pas été validés par un test rétrospectif sur ces données</b> ; rien ne garantit qu'ils aient déjà permis, ou permettront, de gagner de l'argent.</li>
+    <li><b>Saisonnalité :</b> une moyenne peut être tirée par une seule année extrême ; sur 10 ans, un mois ne compte que 10 observations.</li>
+    <li><b>COT :</b> les positions datent du mardi et sont publiées le vendredi ; les catégories (commerciaux, spéculateurs…) sont celles que déclarent les opérateurs à la CFTC, et le rapport ne couvre que les futures.</li>
+  </ul>
+  <p class="warn-box"><b>Information éducative, pas un conseil en investissement.</b> Le trading de produits dérivés comporte un risque élevé de perte en capital. Les performances passées ne préjugent pas des performances futures.</p>
+
+  <h2 id="perso">Vie privée</h2>
+  <ul>
+    <li><b>Aucun cookie et aucun traceur</b>, aucune mesure d'audience, aucune publicité, aucune ressource chargée depuis un service tiers : le site n'appelle que son propre serveur. Il ne demande aucun compte et ne collecte aucune donnée que vous saisiriez.</li>
+    <li><b>Une seule information est enregistrée dans votre navigateur, et seulement si vous choisissez un thème</b> dans le menu « Thème » : le nom de ce thème (stockage local, clé <code>bulldesk-theme</code>). Elle sert uniquement à afficher le site avec l'apparence demandée, <b>n'est jamais envoyée au serveur</b> et n'identifie personne. Vous l'effacez en choisissant à nouveau le thème par défaut (Terminal) ou en supprimant les données du site dans votre navigateur.</li>
+    <li><b>Adresse IP :</b> pour se protéger des abus, le serveur compte les requêtes par adresse IP dans sa <b>mémoire vive, pendant une minute seulement</b>, sans l'écrire dans un fichier ni dans un journal. L'application n'enregistre aucune adresse IP ; l'hébergeur peut tenir ses propres journaux techniques selon sa politique.</li>
+  </ul>
+
+  <p class="upd">Dernière mise à jour de cette page : 25 septembre 2026.</p>
+</div>
+</main>
+<footer class="f"><div class="wrap">
+  <nav class="fnav" aria-label="Informations"><a href="/a-propos">À propos et méthodologie</a></nav>
+  <p>Sources : CFTC et Yahoo Finance. Information éducative, pas un conseil en investissement.</p>
+</div></footer>
+</body>
+</html>
