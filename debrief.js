@@ -56,14 +56,14 @@ const IMPACT_FR = { High: 'forte', Medium: 'moyenne' };
 function fmtTime(t) { const d = new Date(t); return d.toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }); }
 function recap(events, ccys, now, win) {
   return M.recent(events, ccys, now, win.recapHours || 0).map(e => {
-    const extra = [e.forecast && `prévision ${e.forecast}`, e.previous && `précédent ${e.previous}`].filter(Boolean).join(', ');
+    const extra = [e.actual && `résultat ${e.actual}`, e.forecast && `prévision ${e.forecast}`, e.previous && `précédent ${e.previous}`].filter(Boolean).join(', ');
     return `${fmtTime(e.t)} (Paris) · ${e.ccy} · ${e.title} · importance ${IMPACT_FR[e.impact]}${extra ? ' (' + extra + ')' : ''}`;
   });
 }
 function agenda(events, ccys, now, win = M.horizon(now)) {
   const list = M.upcoming(events, ccys, now, win.hours, win.back);
   return list.slice(0, 12).map(e => {
-    const extra = [e.forecast && `prévision ${e.forecast}`, e.previous && `précédent ${e.previous}`].filter(Boolean).join(', ');
+    const extra = [e.actual && `résultat ${e.actual}`, e.forecast && `prévision ${e.forecast}`, e.previous && `précédent ${e.previous}`].filter(Boolean).join(', ');
     return `${fmtTime(e.t)} (Paris) · ${e.ccy} · ${e.title} · importance ${IMPACT_FR[e.impact]}${extra ? ' (' + extra + ')' : ''}${e.t < now ? ' — déjà publiée' : ''}`;
   });
 }

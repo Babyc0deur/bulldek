@@ -43,7 +43,7 @@ function commit(name, code, value) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Journal des appels sortants : « ↗ source chemin statut durée » (adresse courte, sans paramètre long ; jamais de donnée personnelle).
-const shortUrl = u => { try { const x = new URL(u); return x.host + x.pathname.slice(0, 60) + (x.search ? x.search.slice(0, 40) : ''); } catch { return String(u).slice(0, 80); } };
+const shortUrl = MACRO.redactUrl;
 async function outbound(url, options, read) {
   const t0 = Date.now();
   try {
@@ -170,7 +170,15 @@ const MACRO_FETCH = {
     for (const [key, url] of YIELDS.yieldsUrls()) { parts.push([key, await getText(url)]); await sleep(300); }
     return YIELDS.parseYields(parts);
   },
-  calendar: async () => {                                                  // cette semaine + la suivante (indisponible avant le week-end : on l'ignore)
+  calendar: async () => {
+    const key = process.env.FMP_API_KEY;                                   // facultative : avec elle, le calendrier inclut le chiffre publié
+    if (key) {
+      try {
+        const ev = MACRO.parseFmpCalendar(await getJSON(MACRO.fmpUrl(key)));
+        if (ev.length) { logV('calendrier : source FMP, ' + ev.length + ' événements (chiffres publiés inclus)'); return ev; }
+        log('calendrier FMP vide : repli sur Forex Factory');
+      } catch (e) { log('calendrier FMP indisponible (' + e.message + ') : repli sur Forex Factory'); }
+    }                                                  // cette semaine + la suivante (indisponible avant le week-end : on l'ignore)
     const week = MACRO.parseCalendar(await getJSON(MACRO.CALENDAR_URL));
     const next = await getJSON(MACRO.CALENDAR_NEXT_URL).then(MACRO.parseCalendar).catch(() => []);
     return week.concat(next).sort((a, b) => a.t - b.t);

@@ -126,7 +126,7 @@ function agendaStory(row, market, events, now, win = { weekend: false, hours: 48
     else read = 'l\'impact dépend de l\'écart avec les attentes';
     let effect = '';
     if (ty !== 'autre') effect = s === 0 ? ` Pour ${market.name}, la transmission est peu directe : la réaction dépendra surtout du sentiment global.` : ` Pour ${market.name}, un résultat restrictif serait plutôt ${s < 0 ? 'défavorable' : 'favorable'} et un résultat accommodant plutôt ${s < 0 ? 'favorable' : 'défavorable'}.`;
-    out.push(`${cap(fmtTime(e.t))} (heure de Paris) : ${e.title} (${e.ccy})${cmp}${past ? ', déjà publiée' : ''} — ${read}.${effect}`);
+    out.push(`${cap(fmtTime(e.t))} (heure de Paris) : ${e.title} (${e.ccy})${cmp}${past ? ', déjà publiée' + (e.actual ? ` (résultat ${e.actual})` : '') : ''} — ${read}.${effect}`);
   }
   out.push('La première réaction à une annonce est souvent brutale et partiellement corrigée ensuite : mieux vaut laisser le marché digérer le chiffre avant d\'en tirer une conclusion.');
   return out.join(' ');
@@ -173,6 +173,21 @@ function ratesStory(row, market, yields, daily, bias) {
 }
 
 // Bilan du week-end : annonces publiées depuis lundi. Notre source ne fournit pas le chiffre publié : la réaction du prix est le meilleur indice de la lecture du marché.
+// Surprise d'une annonce publiée : { dir : sens de l'écart au consensus, hawk : lecture restrictive (+1) ou accommodante (−1) } ; null sans chiffre comparable.
+// Chômage et inscriptions au chômage : un chiffre plus élevé est un signe de faiblesse, donc lu à l'inverse.
+const numOf = v => { const m = String(v == null ? '' : v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+function surprise(e) {
+  const a = numOf(e.actual), f = numOf(e.forecast);
+  if (!e.actual || a == null || f == null) return null;
+  const dir = Math.abs(a - f) < 1e-9 ? 0 : Math.sign(a - f), inv = /unemployment|jobless|claims/i.test(e.title);
+  return { dir, hawk: dir && ['inflation', 'emploi', 'activité'].includes(eventType(e.title)) ? dir * (inv ? -1 : 1) : 0 };
+}
+function verdict(e, market, kind, foreign) {
+  const sp = surprise(e); if (!sp) return '';
+  if (sp.dir === 0) return ', conforme aux attentes';
+  const s = sensitivity(kind, foreign);
+  return `, ${sp.dir > 0 ? 'supérieur' : 'inférieur'} aux attentes${sp.hawk && s ? ` (lecture ${sp.hawk > 0 ? 'restrictive' : 'accommodante'}, plutôt ${sp.hawk * s > 0 ? 'favorable' : 'défavorable'} à ${market.name})` : ''}`;
+}
 function recapStory(row, market, events, now, win) {
   const kind = kindOf(row.group, market.slug), ccys = M.marketCurrencies(market.slug), list = M.recent(events, ccys, now, win.recapHours || 0);
   if (!list.length) return 'Aucune annonce d\'importance moyenne ou forte n\'a été publiée depuis lundi pour les devises de ce marché : la semaine s\'est jouée sur les flux plutôt que sur les chiffres.';
@@ -180,11 +195,12 @@ function recapStory(row, market, events, now, win) {
   const day = e => new Date(e.t).toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
   const out = [`${list.length} annonce${list.length > 1 ? 's' : ''} d'importance moyenne ou forte ${list.length > 1 ? 'ont' : 'a'} rythmé la semaine${strong.length ? ` (dont ${strong.length} d'importance forte)` : ''}.`];
   for (const e of main) {
-    const ty = eventType(e.title), cmp = e.forecast && e.previous ? ` (prévision ${e.forecast}, précédent ${e.previous})` : e.forecast ? ` (prévision ${e.forecast})` : e.previous ? ` (précédent ${e.previous})` : '';
+    const ty = eventType(e.title), parts = [e.actual && `résultat ${e.actual}`, e.forecast && `prévision ${e.forecast}`, e.previous && `précédent ${e.previous}`].filter(Boolean), cmp = parts.length ? ` (${parts.join(', ')})` : '';
     const what = { inflation: 'chiffre d\'inflation', banque: 'communication de banque centrale', emploi: 'donnée d\'emploi', 'activité': 'indicateur d\'activité', autre: 'publication' }[ty];
-    out.push(`${cap(day(e))} : ${what} « ${e.title} » (${e.ccy}${e.impact === 'Medium' ? ', importance moyenne' : ''})${cmp}.`);
+    out.push(`${cap(day(e))} : ${what} « ${e.title} » (${e.ccy}${e.impact === 'Medium' ? ', importance moyenne' : ''})${cmp}${verdict(e, market, kind, ccys.length > 1 && e.ccy === ccys[0])}.`);
   }
-  if (Number.isFinite(row.chgPct)) out.push(`Le résultat exact de ces publications n'est pas repris par notre source ; la réaction du prix est le meilleur indice de la lecture qu'en a faite le marché : ${market.name} a terminé la dernière séance à ${pctTxt(row.chgPct)}${Math.abs(row.chgPct) < 0.5 ? ', un mouvement modeste : les annonces n\'ont pas déclenché de réaction marquée' : row.chgPct > 0 ? ', une réaction plutôt positive' : ', une réaction plutôt négative'}${kind === 'commo' ? ' (pour une matière première, le lien avec ces annonces reste indirect)' : ''}.`);
+  const hasActual = main.some(e => e.actual);
+  if (Number.isFinite(row.chgPct)) out.push(`${hasActual ? 'La réaction du prix dit comment le marché a lu ces chiffres : ' : 'Le résultat exact de ces publications n\'est pas repris par notre source ; la réaction du prix est le meilleur indice de la lecture qu\'en a faite le marché : '}${market.name} a terminé la dernière séance à ${pctTxt(row.chgPct)}${Math.abs(row.chgPct) < 0.5 ? ', un mouvement modeste : les annonces n\'ont pas déclenché de réaction marquée' : row.chgPct > 0 ? ', une réaction plutôt positive' : ', une réaction plutôt négative'}${kind === 'commo' ? ' (pour une matière première, le lien avec ces annonces reste indirect)' : ''}.`);
   return out.join(' ');
 }
 
@@ -212,4 +228,4 @@ function narrative({ market, row, macro = {}, events = [], now, bias, win, sessi
   ];
 }
 
-module.exports = { ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };
+module.exports = { surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };

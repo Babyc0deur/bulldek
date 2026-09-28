@@ -28,6 +28,9 @@ const cpiUrls = (now = Date.now(), years = 6) => chunks().map(c => `${OECD}${CPI
 const ratesUrls = (now = Date.now(), years = 6) => chunks().map(c => `${OECD}${KEI_FLOW}/${c.join('+')}.M.IRSTCI+IR3TIB+IRLT.PA....?startPeriod=${since(now, years)}&format=csv`);
 const merge = (parts, keys) => { const o = Object.fromEntries(keys.map(k => [k, {}])); for (const p of parts) for (const k of keys) Object.assign(o[k], p[k]); return o; };
 const mergeCpi = parts => merge(parts, ['yoy', 'mom']), mergeRates = parts => merge(parts, ['immediate', 'short', 'long']);
+// Calendrier FMP (Financial Modeling Prep, clé gratuite dans FMP_API_KEY) : seule source du site qui fournit le chiffre publié (« actual »).
+const FMP_URL = 'https://financialmodelingprep.com/stable/economic-calendar';
+const fmpUrl = (key, now = Date.now()) => { const d = n => new Date(now + n * 864e5).toISOString().slice(0, 10); return `${FMP_URL}?from=${d(-8)}&to=${d(14)}&apikey=${encodeURIComponent(key)}`; };
 const CALENDAR_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json', CALENDAR_NEXT_URL = 'https://nfs.faireconomy.media/ff_calendar_nextweek.json';
 
 // ---- Analyse du CSV SDMX de l'OCDE ----
@@ -64,8 +67,24 @@ function parseRates(text) {
 const IMPACTS = ['High', 'Medium', 'Low', 'Holiday'];
 function parseCalendar(list) {
   if (!Array.isArray(list)) throw new Error('calendrier inattendu');
-  return list.map(e => ({ t: Date.parse(e.date), ccy: String(e.country || ''), title: String(e.title || ''), impact: IMPACTS.includes(e.impact) ? e.impact : 'Low', forecast: String(e.forecast || ''), previous: String(e.previous || '') }))
+  return list.map(e => ({ t: Date.parse(e.date), ccy: String(e.country || ''), title: String(e.title || ''), impact: IMPACTS.includes(e.impact) ? e.impact : 'Low', forecast: String(e.forecast || ''), previous: String(e.previous || ''), actual: '' }))
     .filter(e => isFinite(e.t) && e.ccy && e.title).sort((a, b) => a.t - b.t);
+}
+// Réponse FMP → même forme que parseCalendar, avec le chiffre publié. Une clé invalide ou une offre sans calendrier renvoie un objet
+// d'erreur, pas une liste : on le rejette pour que le serveur retombe sur Forex Factory.
+function parseFmpCalendar(list) {
+  if (!Array.isArray(list)) throw new Error('calendrier FMP inattendu');
+  const s = v => (v == null ? '' : String(v)), IMP = { high: 'High', medium: 'Medium', low: 'Low' };
+  return list.map(e => ({ t: Date.parse(String(e.date || '').replace(' ', 'T') + 'Z'), ccy: s(e.currency), title: s(e.event), impact: IMP[String(e.impact || '').toLowerCase()] || 'Low',
+    forecast: s(e.estimate), previous: s(e.previous), actual: s(e.actual) })).filter(e => isFinite(e.t) && e.ccy && e.title).sort((a, b) => a.t - b.t);
+}
+// Adresse pour le journal : hôte, chemin, début des paramètres, sans jamais une clé d'accès.
+function redactUrl(u) {
+  try {
+    const x = new URL(u);
+    for (const k of [...x.searchParams.keys()]) if (/key|token|secret|pass/i.test(k)) x.searchParams.delete(k);
+    return x.host + x.pathname.slice(0, 60) + (x.search ? x.search.slice(0, 40) : '');
+  } catch { return String(u).replace(/(key|token|secret|pass)[^&]*/gi, '$1=…').slice(0, 80); }
 }
 // Annonces à venir (ou de la journée) pour des devises données, importance moyenne ou forte uniquement.
 function upcoming(events, ccys, now, hours = 48, back = 12) {
@@ -90,4 +109,4 @@ const recent = (events, ccys, now, hours) => (events || []).filter(e => ccys.inc
 const lastOf = s => (s && s.length ? s[s.length - 1] : null);
 const back = (s, n) => (s && s.length > n ? s[s.length - 1 - n] : null);
 
-module.exports = { AREAS, AREA_CODES, MARKET_CCY, marketCurrencies, areaOfCcy, cpiUrls, ratesUrls, mergeCpi, mergeRates, CALENDAR_URL, CALENDAR_NEXT_URL, parseCsv, groupSeries, parseCpi, parseRates, parseCalendar, upcoming, recent, horizon, lastOf, back };
+module.exports = { AREAS, AREA_CODES, MARKET_CCY, marketCurrencies, areaOfCcy, cpiUrls, ratesUrls, mergeCpi, mergeRates, CALENDAR_URL, CALENDAR_NEXT_URL, fmpUrl, parseFmpCalendar, redactUrl, parseCsv, groupSeries, parseCpi, parseRates, parseCalendar, upcoming, recent, horizon, lastOf, back };

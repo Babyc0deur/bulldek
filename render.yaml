@@ -14,6 +14,9 @@ services:
         value: "6"
       # Render place un proxy devant le serveur : sans cette valeur, tous les visiteurs partageraient le même
       # compteur de limite de débit. 1 = un proxy de confiance (celui de Render).
+      # Facultative : clé gratuite financialmodelingprep.com ; ajoute le chiffre publié des annonces au calendrier (à saisir dans le tableau de bord Render).
+      - key: FMP_API_KEY
+        sync: false
       - key: TRUST_PROXY
         value: "1"
       - key: RATE_API
