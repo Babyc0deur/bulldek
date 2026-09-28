@@ -4,6 +4,8 @@ Tableau de bord des marchés à terme : **saisonnalité**, **Williams %R** (14 j
 
 Application Node.js **sans aucune dépendance** (`package.json` n'en déclare pas). Information éducative, pas un conseil en investissement.
 
+Dépôt : [github.com/Babyc0deur/bulldek](https://github.com/Babyc0deur/bulldek)
+
 ## Démarrer
 
 ```bash
@@ -27,6 +29,7 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `RATE_API` / `RATE_WEB` | `120` / `300` | Requêtes par minute et par visiteur (`/api/*` / pages et fichiers). `/health` n'est jamais limité |
 | `RATE_WINDOW_MS` | `60000` | Fenêtre du limiteur |
 | `STORE` | *(auto)* | `json` force le repli sur un fichier JSON |
+| `QUIET` | *(vide)* | `1` réduit le journal du serveur aux échecs et alertes (par défaut : rafraîchissements, sources macro et requêtes, sans jamais écrire d'adresse IP) |
 | `NO_REFRESH` | *(vide)* | `1` désactive la mise à jour automatique (tests, démonstration hors ligne) |
 
 ## Pages et API

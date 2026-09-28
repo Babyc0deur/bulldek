@@ -26,7 +26,13 @@ const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, com
 const store = require('./store.js').openStore(DATA_DIR);
 const loaded = store.load();
 const cache = { ...loaded.data, ts: loaded.ts, lastRefresh: loaded.meta.lastRefresh || 0 };     // ts[jeu][marché] = date de dernière mise à jour
-console.log('stockage :', store.kind);
+// Journal : horodaté, verbeux par défaut (rafraîchissements, sources macro, requêtes). QUIET=1 ne garde que les échecs et alertes.
+// Aucune adresse IP ni en-tête n'est jamais écrit (voir la page « À propos », section Vie privée).
+const QUIET = process.env.QUIET === '1';
+const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+const logV = (...a) => { if (!QUIET) log(...a); };
+const logRequest = (method, target, status, ms) => logV(method, target, status, ms + ' ms');
+log('stockage :', store.kind);
 const errors = {};                                                                          // 'jeu:marché' → { at, msg } : dernier échec de mise à jour, tant qu'il n'a pas été résolu
 const noteError = (name, code, e) => { errors[name + ':' + code] = { at: Date.now(), msg: String((e && e.message) || e).slice(0, 120) }; };
 function commit(name, code, value) {
@@ -36,16 +42,22 @@ function commit(name, code, value) {
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function getJSON(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(25000) });
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
+// Journal des appels sortants : « ↗ source chemin statut durée » (adresse courte, sans paramètre long ; jamais de donnée personnelle).
+const shortUrl = u => { try { const x = new URL(u); return x.host + x.pathname.slice(0, 60) + (x.search ? x.search.slice(0, 40) : ''); } catch { return String(u).slice(0, 80); } };
+async function outbound(url, options, read) {
+  const t0 = Date.now();
+  try {
+    const r = await fetch(url, options);
+    logV('↗', shortUrl(url), r.status, (Date.now() - t0) + ' ms');
+    if (!r.ok) throw new Error(r.status);
+    return await read(r);
+  } catch (e) {
+    if (!(e && /^\d+$/.test(String(e.message)))) logV('↗', shortUrl(url), 'échec', (Date.now() - t0) + ' ms', (e && e.name) || '');    // les erreurs HTTP sont déjà journalisées avec leur statut
+    throw e;
+  }
 }
-async function getText(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'fr' }, signal: AbortSignal.timeout(40000) });
-  if (!r.ok) throw new Error(r.status);
-  return r.text();
-}
+const getJSON = url => outbound(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(25000) }, r => r.json());
+const getText = url => outbound(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'fr' }, signal: AbortSignal.timeout(40000) }, r => r.text());
 const yahoo = (sym, range, interval) =>
   getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=${interval}`).then(j => j.chart.result[0]);
 
@@ -102,18 +114,35 @@ async function fresh(name, code, ttl, fn) {
   return c;
 }
 
+// État du cache en une ligne par jeu de données : combien de marchés, âge de la plus ancienne et de la plus récente mise à jour.
+function cacheSummary() {
+  const age = ms => (ms < 3600e3 ? Math.round(ms / 60e3) + ' min' : ms < 48 * 3600e3 ? (ms / 3600e3).toFixed(1) + ' h' : Math.round(ms / 864e5) + ' j');
+  const now = Date.now();
+  for (const name of ['daily', 'weekly', 'cot', 'tff', 'disagg']) {
+    const ts = Object.values(cache.ts[name] || {}).filter(Boolean);
+    logV('cache ' + name + ' : ' + ts.length + ' marché' + (ts.length > 1 ? 's' : '') + (ts.length ? ', mis à jour il y a ' + age(now - Math.max(...ts)) + ' (le plus ancien : ' + age(now - Math.min(...ts)) + ')' : ' — vide'));
+  }
+  logV('cache macro : ' + Object.keys(MACRO_TTL).map(n => n + ' ' + (cache.ts.macro[n] ? 'il y a ' + age(now - cache.ts.macro[n]) : 'vide')).join(', '));
+}
+
 async function refreshAll() {
   const now = Date.now();
+  const t0 = Date.now(); let fails = 0;
+  logV('rafraîchissement : ' + MARKETS.length + ' marchés');
   const dailyDue = m => !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || now - (cache.ts.daily[m.code] || 0) > DAILY_MS;
   for (const m of MARKETS) {
+    const done = [];
     for (const [name, fn] of [['weekly', refreshWeekly], ...(dailyDue(m) ? [['daily', refreshDaily]] : []), ['cot', refreshCot], ...(m.tff ? [['tff', refreshTff]] : []), ...(m.disagg ? [['disagg', refreshDisagg]] : [])]) {
-      try { await fn(m.code); } catch (e) { noteError(name, m.code, e); console.log(m.slug, name, 'échec:', e.message); }
+      const t1 = Date.now();
+      try { await fn(m.code); done.push(name + ' ' + (Date.now() - t1) + ' ms'); } catch (e) { fails++; noteError(name, m.code, e); log(m.slug, name, 'échec:', e.message); }
     }
+    logV(m.slug + ' : ' + (done.join(', ') || 'rien de mis à jour'));
     await sleep(300);
   }
   for (const name of Object.keys(MACRO_TTL)) macroData(name).catch(() => {});                 // en arrière-plan : l'OCDE peut prendre quelques minutes
   cache.lastRefresh = Date.now(); store.putMeta('lastRefresh', cache.lastRefresh);
-  console.log('données rafraîchies', new Date().toISOString());
+  cacheSummary();
+  log('données rafraîchies en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s (' + fails + ' échec' + (fails > 1 ? 's' : '') + ')');
 }
 
 // ---- Macro : inflation et taux (OCDE, une requête groupée par jeu, limite d'appels stricte → 24 h et pause après un échec) ; calendrier (3 h) ----
@@ -148,9 +177,12 @@ const MACRO_FETCH = {
   },
 };
 async function refreshMacro(name) {
+  const t0 = Date.now();
+  logV('macro ' + name + ' : téléchargement…');
   const value = await MACRO_FETCH[name]();
   if (!value || (name === 'calendar' ? !value.length : !Object.keys(Object.values(value)[0] || {}).length)) throw new Error('vide');
   commit('macro', name, value);
+  logV('macro ' + name + ' : ok en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
   return value;
 }
 // Renvoie les données macro (anciennes si la source est en échec) ; ne retente pas avant MACRO_RETRY_MS.
@@ -159,7 +191,7 @@ async function macroData(name) {
   if (c && Date.now() - at <= MACRO_TTL[name]) return c;
   if (Date.now() - (macroFail[name] || 0) < MACRO_RETRY_MS) return c || null;
   try { return await flight('macro:' + name, refreshMacro)(name); }
-  catch (e) { macroFail[name] = Date.now(); noteError('macro', name, e); console.log('macro', name, 'échec :', e.message); return c || null; }
+  catch (e) { macroFail[name] = Date.now(); noteError('macro', name, e); log('macro', name, 'échec :', e.message); return c || null; }
 }
 const macroSnapshot = () => ({ cpi: cache.macro.cpi || null, rates: cache.macro.rates || null, yields: cache.macro.yields || null });
 
@@ -274,6 +306,8 @@ const limiter = createLimiter({ windowMs: RATE_WINDOW_MS });
 setInterval(() => limiter.sweep(), RATE_WINDOW_MS).unref();
 
 const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
+  const t0 = Date.now();
+  res.on('finish', () => { if (req.url !== '/health') logRequest(req.method, req.url.slice(0, 120), res.statusCode, Date.now() - t0); });      // sans IP ni en-têtes
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
   if (TRUST_PROXY && req.headers['x-forwarded-proto'] === 'https') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (req.url.length > MAX_URL) return send(res, 414, '{"error":"URL trop longue"}');
@@ -355,16 +389,18 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       if (known) return send(res, 200, fs.readFileSync(path.join(__dirname, 'market.html')), 'text/html');
     }
     send(res, 404, '{"error":"not found"}');
-  } catch (e) { console.log('erreur', u.pathname, e.message); send(res, 502, JSON.stringify({ error: 'source indisponible' })); }
+  } catch (e) { log('erreur', u.pathname, e.message); send(res, 502, JSON.stringify({ error: 'source indisponible' })); }
 });
 // Délais : évite les connexions lentes qui occupent le serveur (slowloris) et les requêtes qui traînent.
 server.headersTimeout = 10000; server.requestTimeout = 15000; server.keepAliveTimeout = 5000; server.maxRequestsPerSocket = 1000;
-server.listen(PORT, () => console.log('BullDesk sur le port', PORT));
-process.on('unhandledRejection', e => console.log('rejet non géré :', e && e.message));
+server.on('error', e => { if (e.code === 'EADDRINUSE') { log('ERREUR : le port ' + PORT + ' est déjà utilisé (une autre instance tourne ?). Arrêtez-la ou lancez avec un autre port : PORT=8124 npm start'); process.exit(1); } throw e; });
+server.listen(PORT, () => { log('BullDesk sur le port', PORT); cacheSummary(); logV('config : données dans ' + DATA_DIR + ', mise à jour toutes les ' + REFRESH_MS / 36e5 + ' h' + (process.env.NO_REFRESH ? ' (désactivée)' : '') + ', TRUST_PROXY=' + TRUST_PROXY); });
+process.on('unhandledRejection', e => log('rejet non géré :', e && e.message));
 
 // Rafraîchissement automatique : au démarrage si le cache est périmé, puis à intervalle régulier.
 const stale = MARKETS.some(m => Date.now() - (cache.ts.weekly[m.code] || 0) > REFRESH_MS || !cache.weekly[m.code] || !cache.cot[m.code] || !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || (m.disagg && !cache.disagg[m.code]));
 if (!process.env.NO_REFRESH) {
+  logV(stale ? 'cache incomplet ou périmé : mise à jour au démarrage' : 'cache à jour : prochaine mise à jour dans ' + REFRESH_MS / 36e5 + ' h');
   if (stale) refreshAll();
   setInterval(refreshAll, REFRESH_MS);
 }
