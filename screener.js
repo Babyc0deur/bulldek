@@ -6,6 +6,7 @@
   BD.freshness(document.querySelector('#fresh'));                                          // résumé de fraîcheur (non bloquant)
   const rows = data.rows, GR = [...new Set(rows.map(r => r.group))];
   GR.forEach(g => $('#grp').add(new Option(g, g)));
+  if (GR.includes('Indices')) $('#grp').value = 'Indices';                                   // catégorie par défaut du screener
   $('#upd').textContent = `Saison : ${data.week}` + (data.updated ? ` · prix mis à jour le ${new Date(data.updated).toLocaleString('fr-FR')}` : '');
 
   const COLS = [

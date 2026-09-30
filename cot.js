@@ -36,7 +36,7 @@ async function renderCot(m, root) {
     <p>Le COT Index situe cette position par rapport à l'historique : d'après notre calcul sur les commerciaux, il est à <b>${idx6.toFixed(1)} %</b> sur 6 mois et à <b>${idx36.toFixed(1)} %</b> sur 36 mois. Le prochain rapport sortira vendredi prochain, avec les données du mardi précédent.</p>`);
 
   // ---- gabarit ----
-  const chips = GR.map((g, i) => `<button class="chip ${i < 3 ? 'on' : ''}" data-k="${g.k}" data-c="${g.color}" aria-pressed="${i < 3}"><i></i>${g.name}</button>`).join('');
+  const chips = GR.map(g => `<button class="chip ${g.k === 'l' ? '' : 'on'}" data-k="${g.k}" data-c="${g.color}" aria-pressed="${g.k !== 'l'}"><i></i>${g.name}</button>`).join('');
   const opts = GR.map(g => `<option value="${g.k}">${g.name}</option>`).join('');
   root.innerHTML = `
    <div class="sechead"><h2 class="sec">Rapport COT – ${m.name}</h2><div class="ranges" id="ranges" role="group" aria-label="Période affichée"><button class="btn" data-m="6" aria-pressed="false">6m</button><button class="btn on" data-m="12" aria-pressed="true">1a</button><button class="btn" data-m="24" aria-pressed="false">2a</button><button class="btn" data-m="36" aria-pressed="false">3a</button></div></div>
@@ -84,7 +84,7 @@ async function renderCot(m, root) {
   tick(); setInterval(() => { if (!document.hidden) tick(); }, 30000);
 
   // ---- graphiques historiques ----
-  const active = new Set(['c', 'l', 's']); let months = 12, gsel = 'c';
+  const active = new Set(['c', 's']); let months = 12, gsel = 'c';                            // Grands spéculateurs décoché par défaut
   const end = gC.pts.at(-1)[0];
   const xt = (a, b) => Array.from({ length: 6 }, (_, i) => { const t = a + (b - a) * i / 5; return [t, new Date(t).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })]; });
   const tip = t => new Date(t).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });

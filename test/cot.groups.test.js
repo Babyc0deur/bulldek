@@ -37,9 +37,11 @@ test('le tableau et l\'analyse TFF restent affichés (seuls les groupes du graph
   assert.ok(root.innerHTML.includes('id="cNet"'));
 });
 
-test('le graphique des positions nettes ne contient plus que 3 courbes possibles, les 3 actives par défaut', async () => {
-  const { rec } = await run({ name: 'Nasdaq 100 E-Mini', code: '209742', slug: 'nasdaq-100', tff: true, disagg: false });
-  assert.deepEqual(rec.charts['#cNet'].series.map(s => s.name), ['Commerciaux', 'Grands spéculateurs', 'Petits traders']);
+test('le graphique des positions nettes ne contient plus que 3 courbes possibles, Grands spéculateurs décoché par défaut', async () => {
+  const { root, rec } = await run({ name: 'Nasdaq 100 E-Mini', code: '209742', slug: 'nasdaq-100', tff: true, disagg: false });
+  assert.deepEqual(rec.charts['#cNet'].series.map(s => s.name), ['Commerciaux', 'Petits traders']);
+  const c = chips(root.innerHTML); assert.deepEqual(c, ['Commerciaux', 'Grands spéculateurs', 'Petits traders']);
+  assert.match(root.innerHTML, /data-k="l" data-c="[^"]*" aria-pressed="false"/); assert.match(root.innerHTML, /data-k="c" data-c="[^"]*" aria-pressed="true"/); assert.match(root.innerHTML, /data-k="s" data-c="[^"]*" aria-pressed="true"/);
 });
 
 test('matière première (Disaggregated) : les positions nettes ne proposent plus que les 3 groupes Legacy', async () => {
@@ -55,5 +57,5 @@ test('le tableau et l\'analyse Disaggregated restent affichés (seul le graphiqu
   const dis = el('#disSec').innerHTML;
   assert.match(dis, /COT Disaggregated/); for (const g of ['Producteurs', 'Swap dealers', 'Managed money', 'Autres']) assert.ok(dis.includes(g), g + ' absent du tableau Disaggregated');
   assert.equal(rec.gauges.length, 4);                                                       // commerciaux 6/36 mois + managed money 6/36 mois, calculé à part
-  assert.deepEqual(rec.charts['#cNet'].series.map(s => s.name), ['Commerciaux', 'Grands spéculateurs', 'Petits traders']);
+  assert.deepEqual(rec.charts['#cNet'].series.map(s => s.name), ['Commerciaux', 'Petits traders']);
 });

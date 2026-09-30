@@ -109,3 +109,13 @@ test('screener : chaque ligne a exactement autant de cellules que d\'en-têtes (
   for (const r of rowsHtml(html)) assert.equal((r.html.match(/<td[ >]/g) || []).length, entetes, `ligne ${r.slug} : cellules ≠ en-têtes`);
   assert.doesNotMatch(html, /<!--/, 'aucun commentaire HTML résiduel');
 });
+
+test('screener : catégorie « Indices » sélectionnée par défaut quand elle existe', async () => {
+  const s = runScreener(ROWS); await wait();
+  assert.equal(s.el('#grp').value, 'Indices');
+});
+
+test('screener : sans marché « Indices », aucune catégorie n\'est forcée', async () => {
+  const s = runScreener([mk({ group: 'Metals' })]); await wait();
+  assert.equal(s.el('#grp').value, '');
+});
