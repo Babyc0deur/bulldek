@@ -11,7 +11,7 @@
 
   const COLS = [
     ['name', 'Actif'], ['price', 'Prix'], ['chgPct', 'Jour'], ['idx6', 'COT 6 mois'],
-    ['season', `Saison ${data.week} (10 a.)`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
+    ['season', `Saison ${data.week} (20 a. max)`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
   ];
   const val = (r, k) => k === 'season' ? r.season.avgPct : k === 'oi' ? (r.oi ? r.oi.chgPct : null) : r[k];
   let sk = 'score', dir = -1;

@@ -66,7 +66,7 @@ test('performance indisponible : historique plus court que la période', async (
 
 test('signaux côte à côte : les 8 indicateurs des deux marchés, avec les mêmes règles que le screener', async () => {
   const { root } = await run(), html = root.innerHTML, t = text(html);
-  for (const l of ['Prix', 'Variation du jour', 'COT Index 6 mois', 'COT Index 36 mois', 'Williams %R \\(14 j\\)', 'Saison de la semaine \\(10 ans\\)', 'Confluence']) assert.match(t, new RegExp(l));
+  for (const l of ['Prix', 'Variation du jour', 'COT Index 6 mois', 'COT Index 36 mois', 'Williams %R \\(14 j\\)', 'Saison de la semaine \\(20 ans max\\)', 'Confluence']) assert.match(t, new RegExp(l));
   assert.match(t, /30,798/); assert.match(t, /4,300\.5/);                           // prix formatés
   assert.match(t, /0 % Vente/); assert.match(t, /90 % Achat/);                      // COT Index 6 mois de A = 0 : Vente ; 36 mois de B = 90 : Achat
   assert.match(t, /-12\.7 Surachat/); assert.doesNotMatch(t, /hebdo/i);             // zones du Williams %R

@@ -27,7 +27,7 @@ function renderCompare({ a, b, daily, cot, rows, now }, root) {
     `<span class="${cls(r.season.avgPct)}">${pct(r.season.avgPct)}</span> <small>${r.season.up}/${r.season.n} hausse</small>`,
     B.sigDot(r.sig.cot, 'COT') + B.sigDot(r.sig.season, 'Saison') + B.sigDot(r.sig.wr, 'Williams %R') + B.sigDot(r.sig.oi, 'Open interest') + ' ' + B.sigPill((r.score > 0 ? '+' : '') + r.score, CALC.confluenceClass(r.score)),
   ].map(x => '<td>' + x + '</td>');
-  const LABELS = ['Prix', 'Variation du jour', 'COT Index 6 mois', 'COT Index 36 mois', 'Williams %R (14 j)', 'Open interest (semaine)', 'Saison de la semaine (10 ans)', 'Confluence'];
+  const LABELS = ['Prix', 'Variation du jour', 'COT Index 6 mois', 'COT Index 36 mois', 'Williams %R (14 j)', 'Open interest (semaine)', 'Saison de la semaine (20 ans max)', 'Confluence'];
   const ca = cells(rows.a), cb = cells(rows.b);
   const sigTable = `<table class="cmp"><thead><tr><th scope="col"><span class="sr-only">Indicateur</span></th><th scope="col" class="a-c">${na}</th><th scope="col" class="b-c">${nb}</th></tr></thead><tbody>`
     + LABELS.map((l, i) => `<tr><th scope="row">${l}</th>${ca[i]}${cb[i]}</tr>`).join('') + '</tbody></table>';

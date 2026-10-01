@@ -279,7 +279,7 @@ function screener() {
     const net = cot.hist.map(r => r[1] - r[2]);                       // commerciaux : longs − shorts
     const TH = CALC.THRESHOLDS, idx6 = CALC.cotIndex(net, TH.cotShortWeeks).at(-1), idx36 = CALC.cotIndex(net, TH.cotLongWeeks).at(-1);
     const wr = CALC.williamsR(d, CALC.THRESHOLDS.wrPeriod), w = wr.at(-1)[1], last = d.at(-1), prev = d.at(-2);
-    const season = CALC.seasonalWeek(d, now, 10, nowY);
+    const season = CALC.seasonalWeek(d, now, 20, nowY);                 // jusqu'à 20 années complètes ; moins si l'historique du marché est plus court
     // Future continu non ajusté : un saut de plus de 10 % en une séance signale en général un changement de contrat,
     // qui fausse le Williams %R pendant 14 séances. On l'indique et on neutralise ce signal (sauf crypto, très volatile).
     const recent = d.slice(-TH.rollWindow), roll = m.group !== 'Crypto' && recent.some((r, i) => i && Math.abs(r[1] / recent[i - 1][1] - 1) > TH.rollJump);
