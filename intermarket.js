@@ -5,7 +5,7 @@
 
 // [slug du marché, nom, abréviation de colonne, famille]
 const ASSETS = [
-  ['sp500', 'S&P 500', 'SPX', 'Actions'], ['nasdaq-100', 'Nasdaq 100', 'NDX', 'Actions'], ['russell-2000', 'Russell 2000', 'RUT', 'Actions'],
+  ['sp500', 'S&P 500', 'SPX', 'Actions'], ['nasdaq-100', 'Nasdaq 100', 'NDX', 'Actions'],
   ['10-year-t-note', 'T-Note 10 ans', '10A', 'Obligations'], ['30-year-t-bond', 'T-Bond 30 ans', '30A', 'Obligations'],
   ['us-dollar', 'Dollar américain', 'USD', 'Devises'], ['euro-fx', 'Euro', 'EUR', 'Devises'], ['japanese-yen', 'Yen', 'JPY', 'Devises'],
   ['gold', 'Or', 'Or', 'Matières premières'], ['silver', 'Argent', 'Ag', 'Matières premières'], ['copper', 'Cuivre', 'Cu', 'Matières premières'], ['crude-oil', 'Pétrole (WTI)', 'WTI', 'Matières premières'],
@@ -30,7 +30,7 @@ const PAIRS = [
 ];
 
 // Famille économique d'un marché : détermine le sens à donner à une corrélation (refuge, croissance, effet dollar…).
-const FAMILY = { sp500: 'actions', 'nasdaq-100': 'actions', 'russell-2000': 'actions', 'dow-jones': 'actions', '10-year-t-note': 'obligations', '30-year-t-bond': 'obligations', '5-year-t-note': 'obligations', '2-year-t-note': 'obligations',
+const FAMILY = { sp500: 'actions', 'nasdaq-100': 'actions', 'dow-jones': 'actions', '10-year-t-note': 'obligations', '30-year-t-bond': 'obligations', '5-year-t-note': 'obligations', '2-year-t-note': 'obligations',
   'us-dollar': 'dollar', 'japanese-yen': 'refuge', gold: 'or', silver: 'or', copper: 'cuivre', 'crude-oil': 'petrole', bitcoin: 'crypto' };
 const GROUP_FAMILY = { Indices: 'actions', Bonds: 'obligations', Currencies: 'devises', Crypto: 'crypto', Energy: 'petrole', Metals: 'cuivre', Grains: 'matiere', Softs: 'matiere', Livestock: 'matiere' };
 const familyOf = (slug, group) => FAMILY[slug] || GROUP_FAMILY[group] || 'matiere';
@@ -145,18 +145,19 @@ function profile(market, series, corr) {
 }
 
 // ---------- Ratios intermarchés : un marché divisé par un autre ; la tendance du ratio dit lequel des deux surperforme ----------
-// scale : facteur d'affichage pour des valeurs lisibles (cuivre en dollars par livre, or en dollars par once : le brut vaut ~0,001).
+// Ratios pensés pour qui trade les indices : actions contre refuge, croissance contre valeur, petites contre grandes capitalisations, et les deux grands
+// facteurs externes (dollar, pétrole). up / down : ce que signifie un ratio qui monte / qui baisse.
 const RATIOS = [
-  { id: 'cuivre-or', num: 'copper', den: 'gold', label: 'Cuivre / Or (×1000)', scale: 1000,
-    up: 'le cuivre (croissance industrielle) surperforme l\'or (refuge) : appétit pour le risque et confiance dans la croissance', down: 'l\'or (refuge) surperforme le cuivre (industrie) : prudence et inquiétude sur la croissance' },
-  { id: 'actions-obligations', num: 'sp500', den: '10-year-t-note', label: 'S&P 500 / T-Note 10 ans', scale: 1,
+  { id: 'actions-obligations', num: 'sp500', den: '10-year-t-note', label: 'S&P 500 / T-Note 10 ans',
     up: 'les actions surperforment les obligations : appétit pour le risque', down: 'les obligations surperforment les actions : recherche de refuge' },
-  { id: 'or-argent', num: 'gold', den: 'silver', label: 'Or / Argent', scale: 1,
-    up: 'l\'or surperforme l\'argent : la demande de refuge domine la demande industrielle (ratio élevé en période de crainte)', down: 'l\'argent surperforme l\'or : appétit pour le risque et demande industrielle' },
-  { id: 'petrole-or', num: 'crude-oil', den: 'gold', label: 'Pétrole / Or (×1000)', scale: 1000,
-    up: 'le pétrole surperforme l\'or : la demande économique et l\'inflation énergétique dominent', down: 'l\'or surperforme le pétrole : demande de refuge ou faiblesse de la demande d\'énergie' },
-  { id: 'actions-or', num: 'sp500', den: 'gold', label: 'S&P 500 / Or', scale: 1,
-    up: 'les actions surperforment l\'or : confiance et liquidité', down: 'l\'or surperforme les actions : méfiance et recherche de protection' },
+  { id: 'nasdaq-sp500', num: 'nasdaq-100', den: 'sp500', label: 'Nasdaq 100 / S&P 500',
+    up: 'le Nasdaq surperforme le S&P 500 : leadership de la croissance et de la technologie, souvent avec des taux stables ou en baisse', down: 'le S&P 500 surperforme le Nasdaq : rotation hors de la technologie, fréquente quand les taux montent ou que la prudence gagne' },
+  { id: 'nasdaq-dow', num: 'nasdaq-100', den: 'dow-jones', label: 'Nasdaq 100 / Dow Jones',
+    up: 'la croissance surperforme la valeur : marché porté par la technologie', down: 'la valeur surperforme la croissance : rotation vers les titres cycliques et défensifs du Dow' },
+  { id: 'sp500-dollar', num: 'sp500', den: 'us-dollar', label: 'S&P 500 / Dollar américain',
+    up: 'les actions surperforment le dollar : l\'appétit pour le risque l\'emporte sur la demande de refuge', down: 'le dollar surperforme les actions : recherche de refuge, ou dollar fort qui pèse sur les bénéfices des multinationales' },
+  { id: 'sp500-petrole', num: 'sp500', den: 'crude-oil', label: 'S&P 500 / Pétrole',
+    up: 'les actions surperforment le pétrole : la facture énergétique ne pèse pas sur le marché', down: 'le pétrole surperforme les actions : coûts de l\'énergie et inflation pèsent sur le marché' },
 ];
 const RATIO_SLUGS = [...new Set(RATIOS.flatMap(r => [r.num, r.den]))];
 const sig = v => +v.toPrecision(5);                                       // 5 chiffres significatifs : les ratios bruts peuvent valoir 0,001 comme 80
@@ -169,7 +170,7 @@ function ratios(series, now = Date.now()) {
     const sn = series[r.num], sd = series[r.den];
     if (!sn || !sd || sn.length <= 60 || sd.length <= 60) continue;
     const md = new Map(sd.map(x => [isoDay(x[0]), x[1]])), pts = [];
-    for (const x of sn) { const d = md.get(isoDay(x[0])); if (d) pts.push([x[0], sig(x[1] / d * r.scale)]); }
+    for (const x of sn) { const d = md.get(isoDay(x[0])); if (d) pts.push([x[0], sig(x[1] / d)]); }
     if (pts.length <= 60) continue;
     const n = pts.length, last = pts[n - 1][1], pct = k => (n > k ? Math.round((last / pts[n - 1 - k][1] - 1) * 10000) / 100 : null);
     const win = pts.slice(-250).map(p => p[1]), pos = Math.round(win.filter(v => v <= last).length / win.length * 100);   // au moins 61 valeurs : un ratio plus court est écarté plus haut
