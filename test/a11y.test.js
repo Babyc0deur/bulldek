@@ -3,7 +3,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 
 const ROOT = path.join(__dirname, '..'), read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const PAGES = ['market.html', 'screener.html', 'compare.html', 'about.html'];
+const PAGES = ['market.html', 'screener.html', 'compare.html', 'about.html', 'inflation.html', 'rates.html', 'intermarket.html'];
 const CLIENT_JS = ['cot.js', 'seasonal.js', 'wr.js', 'oi.js', 'compare.js', 'screener.js', 'market.js', 'shared.js'];
 
 // ---- contrastes : rapport de luminance relative (WCAG 2.1), 4,5 minimum pour le texte courant ----
@@ -39,7 +39,7 @@ test('chaque page : langue, un seul h1, zone principale, lien d\'évitement, nav
     assert.match(t, /<footer class="f">/, f);
     assert.match(t, /<nav class="fnav" aria-label="[^"]+">/, f);
   }
-  for (const f of ['screener.html', 'compare.html', 'about.html']) assert.equal((read(f).match(/<h1[ >]/g) || []).length, 1, f + ' : un seul h1');
+  for (const f of ['screener.html', 'compare.html', 'about.html', 'inflation.html', 'rates.html', 'intermarket.html']) assert.equal((read(f).match(/<h1[ >]/g) || []).length, 1, f + ' : un seul h1');
   assert.match(read('shared.js'), /<h1>\$\{m\.name\}/, 'la fiche marché a son h1 (créé par le gabarit commun)');
 });
 

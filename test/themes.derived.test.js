@@ -42,6 +42,6 @@ test('shared.css : hors palette :root, seules quelques couleurs neutres sont fig
 
 test('le thème par défaut du menu, celui des pages et celui de la CSS sont le même : Terminal', () => {
   assert.match(read('theme.js'), /DEFAULT = 'terminal'/);
-  for (const f of ['market.html', 'screener.html', 'compare.html', 'about.html', 'themes.html']) assert.match(read(f), /<html lang="fr" data-theme="terminal">/, f);
+  for (const f of ['market.html', 'screener.html', 'compare.html', 'about.html', 'themes.html', 'inflation.html', 'rates.html', 'intermarket.html']) assert.match(read(f), /<html lang="fr" data-theme="terminal">/, f);
   assert.ok(THEMES.some(t => t.nom === 'terminal'));
 });

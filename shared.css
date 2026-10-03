@@ -288,3 +288,10 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 /* Thème : toujours en haut à droite. Sur la fiche marché, les liens de navigation passent sur une seconde ligne pour lui laisser la place. */
 .top .bar .theme-pick{order:4;margin-left:auto}
 .top .bar:has(.picker) .jump{order:5;flex:1 0 100%;margin-left:0;overflow-x:auto}
+/* Analyse intermarchés : carte de chaleur des corrélations (teintes issues des couleurs du thème, faibles pour garder le texte lisible dans les six thèmes). */
+.hm th,.hm td{text-align:center;white-space:nowrap}.hm tbody th{text-align:left}
+.hm-p2{background:color-mix(in srgb,var(--greenl) 38%,transparent)}.hm-p1{background:color-mix(in srgb,var(--greenl) 20%,transparent)}
+.hm-n1{background:color-mix(in srgb,var(--redl) 20%,transparent)}.hm-n2{background:color-mix(in srgb,var(--redl) 38%,transparent)}
+.hm-na{color:var(--muted)}.hm-self{color:var(--muted)}
+.hm-key{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:.78rem}.hm-key span{padding:3px 10px;border-radius:6px;border:1px solid var(--line)}
+.im-shifts{margin:0;padding-left:18px}.im-shifts li{margin:6px 0;line-height:1.5}

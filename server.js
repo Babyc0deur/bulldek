@@ -16,10 +16,10 @@ const STATIC = {
   '/shared.css': ['shared.css', 'text/css'],
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
 };
-const SCRIPTS = new Set(['macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
+const SCRIPTS = new Set(['intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -294,6 +294,16 @@ function screener() {
   return scrMemo.val;
 }
 
+// ---- Analyse intermarchés : corrélations croisées calculées sur les séances quotidiennes déjà en cache (aucun appel externe), mémorisées 5 minutes ----
+let interMemo = { at: 0, val: null };
+function intermarket() {
+  if (interMemo.val && Date.now() - interMemo.at < 300e3) return interMemo.val;
+  const series = {};
+  for (const slug of INTER.SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && cache.daily[m.code]; if (d && d.length > 60) series[slug] = d; }
+  interMemo = { at: Date.now(), val: INTER.build(series, CALC.correlation) };
+  return interMemo.val;
+}
+
 // ---- Protections : en-têtes de sécurité, limite de débit, validation des requêtes ----
 // CSP stricte : ni script ni style en ligne, aucune ressource tierce.
 const SECURITY_HEADERS = {
@@ -340,6 +350,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       return BY_CODE[c] ? send(res, 200, JSON.stringify({ now: Date.now(), ...status(BY_CODE[c]), lastRefresh: cache.lastRefresh || null })) : send(res, 400, '{"error":"marché inconnu"}');
     }
     if (u.pathname === '/api/screener') return send(res, 200, JSON.stringify(screener()));
+    if (u.pathname === '/api/intermarket') return send(res, 200, JSON.stringify(intermarket()));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');
       if (kind !== 'cpi' && kind !== 'rates') return send(res, 400, '{"error":"kind : cpi ou rates"}');
@@ -388,6 +399,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/a-propos') return send(res, 200, docPage('about.html'), 'text/html');
     if (u.pathname === '/themes') return send(res, 200, fs.readFileSync(path.join(__dirname, 'themes.html')), 'text/html');
     if (u.pathname === '/inflation' || u.pathname === '/taux') return send(res, 200, fs.readFileSync(path.join(__dirname, u.pathname === '/inflation' ? 'inflation.html' : 'rates.html')), 'text/html');
+    if (u.pathname === '/intermarket') return send(res, 200, fs.readFileSync(path.join(__dirname, 'intermarket.html')), 'text/html');
     if (u.pathname === '/compare') return send(res, 200, fs.readFileSync(path.join(__dirname, 'compare.html')), 'text/html');
     if (SCRIPTS.has(section) && !slug) return send(res, 200, fs.readFileSync(path.join(__dirname, section)), 'text/javascript');
     // Une seule page combinée par marché ; les anciennes adresses y redirigent.

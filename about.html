@@ -13,7 +13,7 @@
 <a class="skip" href="#contenu">Aller au contenu</a>
 <header class="top"><div class="wrap bar">
   <a class="logo" href="/">BULL<b>DESK</b></a>
-  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li><li><a href="/a-propos" class="cur-page">À propos</a></li></ul>
+  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/intermarket">Intermarket</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li><li><a href="/a-propos" class="cur-page">À propos</a></li></ul>
 </div></header>
 <main id="contenu">
 <div class="wrap doc">
@@ -78,6 +78,15 @@
 
   <h3>Comparaison de deux marchés</h3>
   <p><b>Performance</b> : dernière clôture rapportée à celle du même jour calendaire de la période (dernière séance antérieure). <b>Corrélation</b> : coefficient de Pearson entre les rendements quotidiens des jours de bourse communs aux deux marchés, sur 63 jours (3 mois), 252 jours (1 an) et 756 jours (3 ans). Elle décrit un mouvement conjoint passé, pas une relation de cause à effet, et change beaucoup avec le temps.</p>
+
+  <h3 id="intermarket">Analyse intermarchés</h3>
+  <p>La page <a href="/intermarket">Intermarket</a> montre comment des marchés de familles différentes évoluent les uns par rapport aux autres : actions (S&amp;P 500, Nasdaq 100, Russell 2000), obligations (T-Note 10 ans, T-Bond 30 ans), devises (dollar, euro, yen), matières premières (or, argent, cuivre, pétrole) et bitcoin. Elle utilise les mêmes prix de futures que le reste du site, sans nouvelle source.</p>
+  <ul>
+    <li><b>Matrice :</b> corrélation de Pearson entre les <b>rendements quotidiens</b> de chaque paire, calculée entre les dates où les deux marchés ont coté, sur 20, 60, 120 ou 250 séances, ou sur tout l'historique commun (jusqu'à 20 ans). Les obligations sont lues sur le prix du contrat : un prix qui monte correspond à des rendements qui baissent.</li>
+    <li><b>Relations classiques :</b> onze liens connus (dollar et or, cuivre et actions, yen et actions…) avec le sens habituel. La lecture compare la corrélation sur 1 an à ce sens : « conforme » à partir de 0,2 dans le bon sens, « lien faible » en dessous, « inversé » sinon. Pour les relations qui changent selon le régime (obligations et actions), on compare le signe récent à celui de l'historique.</li>
+    <li><b>Changements de régime :</b> paires dont la corrélation sur 60 séances est d'un signe opposé à celle de l'historique, avec un lien d'au moins 0,3 en valeur absolue sur 60 séances et 0,15 sur l'historique. Les six plus marqués sont affichés.</li>
+  </ul>
+  <p>Une corrélation décrit un mouvement conjoint passé : elle varie dans le temps, ne prouve aucune relation de cause à effet et ne prévoit rien. Les seuils (0,2 ; 0,3 ; 0,15) sont des conventions, pas le résultat d'un test rétrospectif.</p>
 
   <h3 id="debrief">Debrief du jour</h3>
   <p>Chaque fiche commence par un debrief assemblé automatiquement, sans intelligence artificielle : les mêmes indicateurs que le reste du site, mis en phrases. Deux biais sont affichés. <b>Semaine</b> : somme des signaux COT 6 mois, saisonnalité et open interest (de −3 à +3) ; haussière à +2 ou plus, baissière à −2 ou moins, neutre sinon. <b>Journée</b> : signal du Williams %R (14 jours) plus la direction de la dernière séance si elle dépasse ±0,5 % (de −2 à +2) ; haussière à +1 ou plus, baissière à −1 ou moins. Le contexte macro (inflation, taux directeur, tendance sur 3 et 6 mois), les rendements, la courbe, le taux réel, le VIX, l'inflation PCE, l'indice dollar (DXY) et la corrélation glissante du marché avec ces séries sur ses 60 dernières séances (une corrélation est un repère, jamais une relation de cause à effet) et les annonces d'importance moyenne ou forte des 48 prochaines heures, pour les devises du marché, complètent le tableau ; une annonce forte dans les 24 heures est signalée comme point de vigilance. Ces seuils sont des conventions, pas le résultat d'un test rétrospectif.</p>
