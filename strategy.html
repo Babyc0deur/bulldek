@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stratégie swing sur futures | BullDesk</title>
+<meta name="description" content="Une méthode de swing trading sur futures avec les outils de BullDesk : positionnement COT, saisonnalité, routine de la semaine et conditions d'entrée.">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/themes.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top"><div class="wrap bar">
+  <a class="logo" href="/">BULL<b>DESK</b></a>
+  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/intermarket">Intermarket</a></li><li><a href="/strategie" class="cur-page">Stratégie</a></li><li><a href="/market/sp500">Fiche marché</a></li></ul>
+</div></header>
+<main id="contenu">
+<div class="wrap doc">
+  <h1>Stratégie : le swing trading sur futures</h1>
+  <p class="lead">Une méthode de travail, pas un système clé en main. Elle suit la logique d'un trader swing sur futures liquides : on décide à partir du <b>positionnement des grands acteurs</b> et de la <b>saisonnalité</b>, on affine l'entrée avec le prix. Chaque étape s'appuie sur une page de BullDesk.</p>
+
+  <nav class="toc" aria-label="Sommaire"><ul>
+    <li><a href="#principe">Le principe</a></li><li><a href="#semaine">La routine de la semaine</a></li><li><a href="#setup">Le setup</a></li>
+    <li><a href="#limites">Limites</a></li>
+  </ul></nav>
+
+  <h2 id="principe">Le principe</h2>
+  <ul>
+    <li><b>Horizon :</b> positions tenues de quelques jours à quelques semaines, analyse sur graphique journalier. Ce n'est ni du day trading ni de l'investissement long terme.</li>
+    <li><b>Univers :</b> des futures très liquides (indices, énergie, métaux, devises, obligations). Le site en suit 37.</li>
+    <li><b>Peu de positions à la fois :</b> par exemple quatre au maximum, pour que chaque trade reste suivi et que le risque total reste connu.</li>
+    <li><b>Deux piliers de décision :</b> le COT (qui est positionné, et dans quelle mesure c'est extrême) et la saisonnalité (ce que le marché fait d'habitude à cette période).</li>
+    <li><b>Un déclencheur :</b> le Williams %R, l'open interest et le prix servent à choisir le moment, pas la direction.</li>
+  </ul>
+
+  <h2 id="semaine">La routine de la semaine</h2>
+  <div class="tw"><table class="doc-t">
+    <thead><tr><th scope="col">Moment</th><th scope="col">Action</th><th scope="col">Où</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Dimanche</th><td>Plan de la semaine : repérer les marchés dont la confluence atteint ±{{CONF}} ou plus, lire l'agenda des annonces.</td><td><a href="/screener">Screener</a>, <a href="/market/sp500">fiche marché</a> (débrief)</td></tr>
+      <tr><th scope="row">Dimanche</th><td>Vérifier le contexte : régime inflation / déflation, ratios, corrélations qui s'inversent.</td><td><a href="/intermarket">Intermarket</a>, <a href="/taux">Taux</a>, <a href="/inflation">Inflation</a></td></tr>
+      <tr><th scope="row">Chaque jour</th><td>Un quart d'heure : mettre à jour la liste de suivi, vérifier les stops, regarder le Williams %R et les annonces du jour.</td><td>Fiche marché</td></tr>
+      <tr><th scope="row">Mardi</th><td>Les positions COT sont arrêtées au mardi et publiées le vendredi : le nouveau rapport peut changer la lecture le week-end.</td><td><a href="/screener">Screener</a></td></tr>
+      <tr><th scope="row">Vendredi</th><td>Décider quoi garder pendant le week-end ; poser les ordres de protection.</td><td>Fiche marché</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 id="setup">Le setup</h2>
+  <p>On cherche des signaux qui vont dans le même sens. Chaque lecture vaut +1, 0 ou −1 (les mêmes seuils que le site) ; la confluence additionne les quatre premières. À partir de +{{CONF}} (ou −{{CONF}}), le marché est présenté comme haussier (baissier).</p>
+  <div class="tw"><table class="doc-t">
+    <thead><tr><th scope="col">Étape</th><th scope="col">Condition pour un achat</th><th scope="col">Condition pour une vente</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">1. Positionnement (COT)</th><td>COT Index 6 mois des commerciaux d'au moins {{COT_BUY}} %</td><td>COT Index 6 mois d'au plus {{COT_SELL}} %</td></tr>
+      <tr><th scope="row">2. Saisonnalité</th><td>La semaine a été haussière dans au moins {{SEASON_HIT_PCT}} % des années (au moins {{SEASON_MIN_YEARS}} années complètes)</td><td>La semaine a été baissière dans au moins {{SEASON_HIT_PCT}} % des années</td></tr>
+      <tr><th scope="row">3. Timing (Williams %R)</th><td>Williams %R sous {{WR_LOW}} (survente) : signal de rebond, à confirmer par le prix</td><td>Williams %R au-dessus de {{WR_HIGH}} (surachat) : signal de repli, à confirmer par le prix</td></tr>
+      <tr><th scope="row">4. Open interest</th><td>Prix et open interest en hausse sur la semaine : tendance alimentée</td><td>Prix en baisse et open interest en hausse sur la semaine</td></tr>
+      <tr><th scope="row">5. Contexte (Intermarket)</th><td>Régime et ratios qui ne contredisent pas le trade</td><td>Régime et ratios qui ne contredisent pas le trade</td></tr>
+    </tbody>
+  </table></div>
+  <p>L'étape 5 est un filtre, pas un signal : si le dollar, les taux ou le pétrole poussent contre le trade, on réduit la taille ou on passe son tour. Avant d'entrer, vérifiez aussi qu'aucune annonce majeure (inflation, emploi, banque centrale) ne tombe dans l'heure ou la séance qui suit.</p>
+
+  <h2 id="limites">Limites</h2>
+  <ul>
+    <li>Cette page décrit une méthode de travail à partir des indicateurs du site. Elle ne donne <b>aucune performance passée ni promesse de gain</b>.</li>
+    <li>Le COT est publié avec du retard et décrit une photo du mardi. La saisonnalité est une tendance moyenne, pas une règle.</li>
+    <li>Les seuils (±{{CONF}}, {{COT_BUY}} / {{COT_SELL}} %, Williams %R sur {{WR_PERIOD}} jours) sont des conventions courantes, pas des valeurs optimisées.</li>
+    <li>Le trading de futures comporte un risque de perte supérieur au capital engagé. Testez toute méthode en simulation avant d'engager de l'argent réel.</li>
+  </ul>
+  <p>Voir aussi : <a href="/a-propos">À propos et méthodologie</a> pour le détail du calcul de chaque indicateur.</p>
+</div>
+</main>
+<footer class="f"><div class="wrap">
+  <nav class="fnav" aria-label="Informations"><a href="/a-propos">À propos et méthodologie</a></nav>
+  <p>Information éducative, pas un conseil en investissement.</p>
+</div></footer>
+<script src="/shared.js"></script>
+</body>
+</html>
