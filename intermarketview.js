@@ -28,10 +28,10 @@ function renderIntermarket(data, root, pick = {}) {
 
   $('#imPairs').innerHTML = `<thead><tr><th scope="col">Relation</th><th scope="col">Théorie</th><th scope="col">60 séances</th><th scope="col">1 an</th><th scope="col">Historique</th><th scope="col">Lecture</th></tr></thead><tbody>`
     + data.pairs.map(p => `<tr><th scope="row">${p.aName} / ${p.bName}<br><small>${p.why}</small></th><td>${sgn(p.expect)}</td><td class="${cls(p.r60)}">${fr(p.r60)}</td><td class="${cls(p.r250)}">${fr(p.r250)}</td><td class="${cls(p.rMax)}">${fr(p.rMax)}</td>`
-      + `<td><span class="sig sm ${p.status.key === 'ok' || p.status.key === 'stable' ? 'buy' : p.status.key === 'flip' ? 'sell' : 'wait'}">${p.status.label}</span></td></tr>`).join('') + '</tbody>';
+      + `<td><span class="sig sm ${p.status.key === 'ok' || p.status.key === 'stable' ? 'buy' : p.status.key === 'flip' ? 'sell' : 'wait'}">${p.status.label}</span>${p.reading ? `<br><small>${p.reading}</small>` : ''}</td></tr>`).join('') + '</tbody>';
 
   $('#imShifts').innerHTML = data.shifts.length
-    ? '<ul class="im-shifts">' + data.shifts.map(s => `<li><b>${s.aName} / ${s.bName}</b> : ${fr(s.r60)} sur 60 séances contre ${fr(s.rMax)} sur l'historique — la relation s'est ${s.r60 > 0 ? 'inversée vers un mouvement conjoint' : 'inversée vers des mouvements opposés'}.</li>`).join('') + '</ul>'
+    ? '<ul class="im-shifts">' + data.shifts.map(s => `<li><b>${s.aName} / ${s.bName}</b> : ${fr(s.r60)} sur 60 séances contre ${fr(s.rMax)} sur l'historique — la relation s'est ${s.r60 > 0 ? 'inversée vers un mouvement conjoint' : 'inversée vers des mouvements opposés'}.${s.reading ? ` <em>${s.reading}</em>` : ''}</li>`).join('') + '</ul>'
     : '<p class="note">Aucun changement de régime marqué : le signe des corrélations récentes est cohérent avec l\'historique.</p>';
 
   function paint() {

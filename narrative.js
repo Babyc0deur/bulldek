@@ -1,6 +1,6 @@
 // Récit du debrief : relie les indicateurs entre eux (convergences, contradictions, prix ↔ open interest ↔ positionnement, macro ↔ biais, annonces ↔ marché)
 // au lieu de les aligner. Fonctions pures, sans réseau. Lectures conventionnelles, pas des prévisions.
-const M = require('./macro.js'), Y = require('./yields.js'), CALC = require('./calc.js');
+const M = require('./macro.js'), Y = require('./yields.js'), CALC = require('./calc.js'), I = require('./intermarket.js');
 
 const f1 = v => v.toFixed(1).replace('.', ',').replace('-', '−'), f2 = v => v.toFixed(2).replace('.', ',').replace('-', '−');
 const sg = v => (v >= 0 ? '+' : '−');
@@ -172,6 +172,30 @@ function ratesStory(row, market, yields, daily, bias) {
   return out.join(' ');
 }
 
+// Intermarchés (indices uniquement) : corrélations de l'indice avec les obligations, le dollar, l'or et le pétrole sur 60 séances, comparées à l'historique,
+// avec ce qu'elles signifient et ce que le mouvement récent de chaque moteur a changé pour l'indice. inter = INTER.profile(...) ; null → paragraphe omis.
+const isIndex = (row, market) => (row && row.group === 'Indices') || (market && I.familyOf(market.slug, market.group) === 'actions');
+function interStory(row, market, inter, bias) {
+  if (!inter || !inter.drivers || !inter.drivers.length || !isIndex(row, market)) return null;
+  const b = bias.week.key === 'up' ? 1 : bias.week.key === 'down' ? -1 : 0, ds = inter.drivers.filter(d => d.r60 != null);
+  if (!ds.length) return null;
+  const active = ds.filter(d => Math.abs(d.r60) >= 0.3 || d.flip), quiet = ds.filter(d => !active.includes(d));
+  const out = [`${market.name} est comparé aux obligations, au dollar, à l'or et au pétrole sur les 60 dernières séances, puis à son historique.`];
+  for (const d of active) {
+    const way = d.r60 < 0 ? 'en sens inverse' : 'dans le même sens', ref = d.rMax == null ? '' : `, ${f2(d.rMax)} sur l'historique`;
+    let t = `${d.name} : ${market.name} évolue ${way} (corrélation ${f2(d.r60)} sur 60 séances${ref}, ${Y.strength(d.r60)})${d.flip ? ' — le lien s\'est inversé par rapport à l\'historique' : ''}. ${I.meaning(I.familyOf(market.slug, market.group), d.family, d.r60)}`;
+    if (d.chg5 != null && Math.abs(d.chg5) >= 0.1) {
+      const push = Math.sign(d.r60) * Math.sign(d.chg5);                              // > 0 : le mouvement récent du moteur a plutôt soutenu l'indice
+      t += ` Sur 5 séances, ${d.name} ${d.chg5 > 0 ? 'progresse' : 'recule'} de ${f2(Math.abs(d.chg5))} %, ce qui a plutôt ${push > 0 ? 'soutenu' : 'pesé sur'} l'indice${b ? (push === b ? ', dans le sens du biais de la semaine' : ', à l\'inverse du biais de la semaine (à surveiller)') : ''}.`;
+    }
+    out.push(t);
+  }
+  if (quiet.length) out.push(active.length ? `Peu de lien récent avec ${quiet.map(d => d.name).join(', ')}.` : `Aucune corrélation nette (au-delà de 0,3 en valeur absolue) avec ${quiet.map(d => d.name).join(', ')} : l'indice évolue surtout pour ses propres raisons.`);
+  if (ds.some(d => d.flip)) out.push('Au moins un lien a changé de régime : mieux vaut ne pas se fier à la relation habituelle tant qu\'elle n\'est pas confirmée.');
+  out.push('Une corrélation passée n\'est pas une relation de cause à effet et varie dans le temps : c\'est un repère, pas une règle.');
+  return out.join(' ');
+}
+
 // Bilan du week-end : annonces publiées depuis lundi. Notre source ne fournit pas le chiffre publié : la réaction du prix est le meilleur indice de la lecture du marché.
 // Surprise d'une annonce publiée : { dir : sens de l'écart au consensus, hawk : lecture restrictive (+1) ou accommodante (−1) } ; null sans chiffre comparable.
 // Chômage et inscriptions au chômage : un chiffre plus élevé est un signe de faiblesse, donc lu à l'inverse.
@@ -214,18 +238,19 @@ function watch(row, bias) {
   return out.join(' ');
 }
 
-function narrative({ market, row, macro = {}, events = [], now, bias, win, session, daily }) {
-  const m = macroStory(row, market, macro, bias);
+function narrative({ market, row, macro = {}, events = [], now, bias, win, session, daily, inter }) {
+  const m = macroStory(row, market, macro, bias), im = interStory(row, market, inter, bias);
   return [
     { title: win && win.weekend ? 'Le point de clôture' : 'Le point du jour', text: situation(row, bias, win, session) },
     { title: 'Ce que disent les indicateurs entre eux', text: convergence(row) },
     { title: 'Prix, open interest et momentum', text: priceFlow(row) || 'Données insuffisantes pour relier prix et open interest.' },
     { title: 'Le contexte macro', text: m.text },
     { title: 'Rendements, volatilité et corrélations', text: ratesStory(row, market, macro.yields, daily, bias) },
+    ...(im ? [{ title: 'Intermarchés', text: im }] : []),
     ...(win && win.weekend ? [{ title: 'Les annonces de la semaine écoulée', text: recapStory(row, market, events, now, win) }] : []),
     { title: 'Les annonces à venir', text: agendaStory(row, market, events, now, win) },
     { title: 'Ce qui ferait changer la lecture', text: watch(row, bias) },
   ];
 }
 
-module.exports = { surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };
+module.exports = { interStory, surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };

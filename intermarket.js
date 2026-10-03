@@ -29,6 +29,34 @@ const PAIRS = [
   { a: '30-year-t-bond', b: '10-year-t-note', expect: 1, why: 'Même courbe des taux : doivent évoluer ensemble (contrôle de cohérence).' },
 ];
 
+// Famille économique d'un marché : détermine le sens à donner à une corrélation (refuge, croissance, effet dollar…).
+const FAMILY = { sp500: 'actions', 'nasdaq-100': 'actions', 'russell-2000': 'actions', 'dow-jones': 'actions', '10-year-t-note': 'obligations', '30-year-t-bond': 'obligations', '5-year-t-note': 'obligations', '2-year-t-note': 'obligations',
+  'us-dollar': 'dollar', 'japanese-yen': 'refuge', gold: 'or', silver: 'or', copper: 'cuivre', 'crude-oil': 'petrole', bitcoin: 'crypto' };
+const GROUP_FAMILY = { Indices: 'actions', Bonds: 'obligations', Currencies: 'devises', Crypto: 'crypto', Energy: 'petrole', Metals: 'cuivre', Grains: 'matiere', Softs: 'matiere', Livestock: 'matiere' };
+const familyOf = (slug, group) => FAMILY[slug] || GROUP_FAMILY[group] || 'matiere';
+
+// Ce que signifie, en une phrase, une corrélation r entre deux marchés selon leurs familles. Les obligations sont lues sur le prix du contrat.
+function meaning(famA, famB, r) {
+  const has = (x, y) => (famA === x && famB === y) || (famA === y && famB === x), pos = r > 0;
+  const mat = f => ['or', 'cuivre', 'petrole', 'matiere'].includes(f);
+  if (has('actions', 'obligations')) return pos ? 'Actions et obligations bougent ensemble : l\'inflation et le niveau des taux pèsent sur les deux à la fois, les obligations ne jouent plus leur rôle de protection.' : 'Régime de refuge classique : quand les actions reculent, les obligations montent.';
+  if (has('actions', 'petrole')) return pos ? 'Le pétrole suit la demande économique, comme les actions.' : 'Le pétrole pèse sur les actions (coût de l\'énergie, inflation, choc d\'offre) : sa hausse est un vent contraire.';
+  if (famA === 'dollar' && mat(famB) || famB === 'dollar' && mat(famA)) return pos ? 'Ils montent avec le dollar : un mouvement de refuge ou de demande mondiale l\'emporte sur l\'effet habituel du dollar.' : 'Effet dollar habituel : un dollar fort pèse sur les matières premières cotées en dollars, un dollar faible les soutient.';
+  if (has('or', 'obligations')) return pos ? 'L\'or suit le prix des obligations : des rendements en baisse réduisent le coût de détention d\'un actif qui ne rapporte rien.' : 'L\'or évolue à l\'inverse du prix des obligations : il progresse quand les rendements montent (inflation, défiance).';
+  if (has('actions', 'cuivre')) return pos ? 'Le cuivre confirme les actions : la croissance industrielle soutient les deux.' : 'Le cuivre et les actions divergent : signe de prudence sur la croissance.';
+  if (has('actions', 'or')) return pos ? 'L\'or suit les actions : la liquidité abondante porte tous les actifs, son rôle de refuge s\'efface.' : 'L\'or joue son rôle de refuge face aux actions.';
+  if (has('actions', 'crypto')) return pos ? 'Le bitcoin se comporte comme un actif de croissance, sensible aux mêmes facteurs (taux, liquidité).' : 'Le bitcoin se détache des actions.';
+  if (has('actions', 'refuge')) return pos ? 'Le yen monte avec les actions : son rôle de refuge est en retrait.' : 'Le yen joue son rôle de refuge face aux actions.';
+  if (has('actions', 'dollar')) return pos ? 'Le dollar monte avec les actions : la force américaine domine.' : 'Le dollar fait office de refuge face aux actions.';
+  if (has('actions', 'matiere')) return pos ? 'Cette matière première suit l\'appétit pour le risque et la demande mondiale.' : 'Cette matière première se détache des actions : ses prix répondent à l\'offre (météo, stocks).';
+  if (has('petrole', 'matiere') || has('petrole', 'cuivre')) return pos ? 'Elles partagent un même moteur : coûts de l\'énergie et demande industrielle.' : 'Le pétrole et ce marché évoluent en sens inverse : une énergie plus chère pèse sur ses prix ou sa demande.';
+  if (has('obligations', 'dollar')) return pos ? 'Le dollar monte avec le prix des obligations : mouvement de refuge vers les actifs américains.' : 'Le dollar monte quand les rendements montent : les écarts de taux attirent les capitaux.';
+  return pos ? 'Les deux marchés réagissent au même facteur dominant.' : 'Les deux marchés évoluent en sens inverse : un facteur commun les fait réagir de façon opposée.';
+}
+
+// Le signe sur 60 séances est l'opposé de celui de l'historique, avec des liens assez nets des deux côtés.
+const isShift = (r60, rMax) => r60 != null && rMax != null && Math.abs(r60) >= 0.3 && Math.abs(rMax) >= 0.15 && Math.sign(r60) !== Math.sign(rMax);
+
 const round = v => (v == null ? null : Math.round(v * 1000) / 1000);
 const isoDay = t => new Date(t * 1e3).toISOString().slice(0, 10);
 
@@ -79,19 +107,41 @@ function build(series, corr, now = Date.now()) {
   const name = s => (assets.find(a => a.slug === s) || {}).name;
   const pairs = PAIRS.filter(p => maps[p.a] && maps[p.b]).map(p => {
     const r60 = r(p.a, p.b, 60), r250 = r(p.a, p.b, 250), rMax = r(p.a, p.b, 'max');
-    return { a: p.a, b: p.b, aName: name(p.a), bName: name(p.b), expect: p.expect, why: p.why, r60, r250, rMax, status: readPair(p.expect, r250, rMax) };
+    const rr = Math.abs(r60 == null ? 0 : r60) >= 0.2 ? r60 : r250;
+    return { a: p.a, b: p.b, aName: name(p.a), bName: name(p.b), expect: p.expect, why: p.why, r60, r250, rMax, status: readPair(p.expect, r250, rMax),
+      reading: rr == null || Math.abs(rr) < 0.2 ? null : meaning(familyOf(p.a), familyOf(p.b), rr) };
   });
 
   // Changements de régime : le signe sur 60 séances est l'opposé de celui de l'historique, avec des liens assez nets des deux côtés.
   const shifts = [];
   for (let i = 0; i < assets.length; i++) for (let j = i + 1; j < assets.length; j++) {
     const r60 = matrix[60][i][j], rMax = matrix.max[i][j];
-    if (r60 != null && rMax != null && Math.abs(r60) >= 0.3 && Math.abs(rMax) >= 0.15 && Math.sign(r60) !== Math.sign(rMax))
-      shifts.push({ a: assets[i].slug, b: assets[j].slug, aName: assets[i].name, bName: assets[j].name, r60, rMax, gap: round(Math.abs(r60 - rMax)) });
+    if (isShift(r60, rMax))
+      shifts.push({ a: assets[i].slug, b: assets[j].slug, aName: assets[i].name, bName: assets[j].name, r60, rMax, gap: round(Math.abs(r60 - rMax)), reading: meaning(familyOf(assets[i].slug), familyOf(assets[j].slug), r60) });
   }
   shifts.sort((x, y) => y.gap - x.gap);
 
   return { updated: now, asOf: asOf ? isoDay(asOf) : null, assets, windows: WINDOWS, matrix, pairs, shifts: shifts.slice(0, 6) };
 }
 
-module.exports = { ASSETS, SLUGS, WINDOWS, PAIRS, commonReturns, readPair, build };
+// Grands moteurs auxquels on compare n'importe quel marché : actions, obligations, dollar, or, pétrole.
+const DRIVERS = ['sp500', '10-year-t-note', 'us-dollar', 'gold', 'crude-oil'];
+// Corrélations d'un marché {slug, group} avec les moteurs (sauf lui-même et sa propre famille quand le lien serait une évidence), sur 60 séances, 1 an et tout l'historique,
+// avec la variation du moteur sur 5 séances. series : { slug: [[t, clôture, …], …] } doit contenir le marché et les moteurs. null si le marché n'a pas assez de séances.
+const bloc = f => (f === 'dollar' || f === 'refuge' ? 'devises' : f);          // dollar, yen et autres devises : même bloc (leur lien mutuel est une évidence)
+function profile(market, series, corr) {
+  const own = series[market.slug];
+  if (!own || own.length <= 60) return null;
+  const ownFam = familyOf(market.slug, market.group), mo = new Map(own.map(r => [isoDay(r[0]), r[1]])), od = own.map(r => isoDay(r[0]));
+  const drivers = [];
+  for (const slug of DRIVERS) {
+    const rows = series[slug], a = ASSETS.find(x => x[0] === slug);
+    if (!rows || rows.length <= 60 || slug === market.slug || bloc(familyOf(slug)) === bloc(ownFam) && ['actions', 'obligations', 'devises'].includes(bloc(ownFam))) continue;
+    const all = commonReturns(mo, new Map(rows.map(r => [isoDay(r[0]), r[1]])), od), at = n => round(corr(n === 'max' ? all : all.slice(-n)));
+    const n = rows.length, r60 = at(60), rMax = at('max');
+    drivers.push({ slug, name: a[1], family: familyOf(slug), r60, r250: at(250), rMax, chg5: round((rows[n - 1][1] / rows[n - 6][1] - 1) * 100), flip: isShift(r60, rMax) });
+  }
+  return { family: ownFam, drivers };
+}
+
+module.exports = { ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };

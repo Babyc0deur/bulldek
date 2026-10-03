@@ -110,7 +110,13 @@ function ratesLines(yields, daily) {
   return out;
 }
 
-function debrief({ market, row, macro = {}, events = [], now = Date.now(), daily }) {
+// Lignes détaillées : corrélation de l'indice avec chaque moteur (indices uniquement, comme le paragraphe du récit).
+function interLines(inter, row, market) {
+  if (!inter || !inter.drivers || !((row && row.group === 'Indices') || market.group === 'Indices')) return [];
+  return inter.drivers.filter(d => d.r60 != null).map(d => `Corrélation 60 séances avec ${d.name} : ${f2(d.r60)} (historique : ${d.rMax == null ? '–' : f2(d.rMax)})${d.flip ? ' — lien inversé' : ''}`);
+}
+
+function debrief({ market, row, macro = {}, events = [], now = Date.now(), daily, inter }) {
   if (!row || row.missing) return { slug: market.slug, name: market.name, available: false, message: 'Données insuffisantes pour ce marché.' };
   const ccys = M.marketCurrencies(market.slug);
   const win = M.horizon(now), ag = agenda(events, ccys, now, win), risky = M.upcoming(events, ccys, now, win.weekend ? win.hours : 24, win.back).some(e => e.impact === 'High');
@@ -122,6 +128,7 @@ function debrief({ market, row, macro = {}, events = [], now = Date.now(), daily
     { title: 'Positionnement (COT)', lines: positioning(row) },
     { title: 'Contexte macro', lines: macroLines(market, macro, ccys) },
     { title: 'Rendements, courbe et risque', lines: ratesLines(macro.yields, daily) },
+    ...(interLines(inter, row, market).length ? [{ title: 'Intermarchés', lines: interLines(inter, row, market) }] : []),
     ...(win.weekend ? [{ title: 'Annonces de la semaine écoulée (depuis lundi)', lines: recap(events, ccys, now, win) }] : []),
     { title: win.weekend ? 'Agenda de la semaine qui s\'ouvre' : 'Agenda économique (48 h)', lines: ag },
   ];
@@ -134,7 +141,7 @@ function debrief({ market, row, macro = {}, events = [], now = Date.now(), daily
   if (!macro.yields) attention.push('Rendements, courbe et VIX pas encore chargés.');
   if (attention.length) sections.push({ title: 'Points de vigilance', lines: attention });
   for (const s of sections) if (!s.lines.length) s.lines = [s.title.startsWith('Annonces de la semaine') ? 'Aucune annonce importante depuis lundi pour les devises concernées.' : s.title.startsWith('Agenda') ? (win.weekend ? (events.some(e => e.t >= win.start) ? 'Aucune annonce importante prévue la semaine prochaine pour les devises concernées.' : 'Calendrier de la semaine prochaine pas encore publié par notre source (généralement le dimanche soir).') : 'Aucune annonce importante prévue sur cette période pour les devises concernées.') : 'Données indisponibles.'];
-  const story = narrative({ market, row, macro, events, now, bias, win, session, daily });
+  const story = narrative({ market, row, macro, events, now, bias, win, session, daily, inter });
   return { slug: market.slug, name: market.name, available: true, generated: now, weekend: win.weekend, session, score: row.score, bias, story, sections,
     note: 'Repères pédagogiques issus des indicateurs du site, sans prévision ni conseil en investissement.' };
 }

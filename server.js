@@ -368,7 +368,9 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       await macroData('yields');                                                              // FRED : rapide et fiable
       for (const n of ['cpi', 'rates']) macroData(n).catch(() => {});                        // l'OCDE est lente et capricieuse : le debrief n'attend pas, il utilise ce qui est en cache
       const row = screener().rows.find(r => r.slug === m.slug);
-      return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: cache.daily[m.code] })));
+      let inter = null;                                                           // intermarchés : indices uniquement
+      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = cache.daily[mm.code]; } inter = INTER.profile(m, series, CALC.correlation); }
+      return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: cache.daily[m.code], inter })));
     }
     if (u.pathname.startsWith('/api/')) {
       const m = BY_CODE[u.searchParams.get('code')];
