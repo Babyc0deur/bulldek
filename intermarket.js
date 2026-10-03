@@ -144,4 +144,42 @@ function profile(market, series, corr) {
   return { family: ownFam, drivers };
 }
 
-module.exports = { ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };
+// ---------- Ratios intermarchés : un marché divisé par un autre ; la tendance du ratio dit lequel des deux surperforme ----------
+// scale : facteur d'affichage pour des valeurs lisibles (cuivre en dollars par livre, or en dollars par once : le brut vaut ~0,001).
+const RATIOS = [
+  { id: 'cuivre-or', num: 'copper', den: 'gold', label: 'Cuivre / Or (×1000)', scale: 1000,
+    up: 'le cuivre (croissance industrielle) surperforme l\'or (refuge) : appétit pour le risque et confiance dans la croissance', down: 'l\'or (refuge) surperforme le cuivre (industrie) : prudence et inquiétude sur la croissance' },
+  { id: 'actions-obligations', num: 'sp500', den: '10-year-t-note', label: 'S&P 500 / T-Note 10 ans', scale: 1,
+    up: 'les actions surperforment les obligations : appétit pour le risque', down: 'les obligations surperforment les actions : recherche de refuge' },
+  { id: 'or-argent', num: 'gold', den: 'silver', label: 'Or / Argent', scale: 1,
+    up: 'l\'or surperforme l\'argent : la demande de refuge domine la demande industrielle (ratio élevé en période de crainte)', down: 'l\'argent surperforme l\'or : appétit pour le risque et demande industrielle' },
+  { id: 'petrole-or', num: 'crude-oil', den: 'gold', label: 'Pétrole / Or (×1000)', scale: 1000,
+    up: 'le pétrole surperforme l\'or : la demande économique et l\'inflation énergétique dominent', down: 'l\'or surperforme le pétrole : demande de refuge ou faiblesse de la demande d\'énergie' },
+  { id: 'actions-or', num: 'sp500', den: 'gold', label: 'S&P 500 / Or', scale: 1,
+    up: 'les actions surperforment l\'or : confiance et liquidité', down: 'l\'or surperforme les actions : méfiance et recherche de protection' },
+];
+const RATIO_SLUGS = [...new Set(RATIOS.flatMap(r => [r.num, r.den]))];
+const sig = v => +v.toPrecision(5);                                       // 5 chiffres significatifs : les ratios bruts peuvent valoir 0,001 comme 80
+
+// series : { slug: [[t en secondes, clôture, …], …] }. Chaque ratio est calculé aux dates où les deux marchés ont coté.
+// Sortie : dernière valeur, variation sur 20 et 60 séances (%), position sur 1 an (rang de la dernière valeur parmi les 250 dernières, 0-100), sens sur 3 mois, lecture, série complète.
+function ratios(series, now = Date.now()) {
+  const out = [];
+  for (const r of RATIOS) {
+    const sn = series[r.num], sd = series[r.den];
+    if (!sn || !sd || sn.length <= 60 || sd.length <= 60) continue;
+    const md = new Map(sd.map(x => [isoDay(x[0]), x[1]])), pts = [];
+    for (const x of sn) { const d = md.get(isoDay(x[0])); if (d) pts.push([x[0], sig(x[1] / d * r.scale)]); }
+    if (pts.length <= 60) continue;
+    const n = pts.length, last = pts[n - 1][1], pct = k => (n > k ? Math.round((last / pts[n - 1 - k][1] - 1) * 10000) / 100 : null);
+    const win = pts.slice(-250).map(p => p[1]), pos = Math.round(win.filter(v => v <= last).length / win.length * 100);   // au moins 61 valeurs : un ratio plus court est écarté plus haut
+    const chg60 = pct(60), dir = chg60 == null || Math.abs(chg60) < 1 ? 'flat' : chg60 > 0 ? 'up' : 'down';
+    const f = v => Math.abs(v).toFixed(1).replace('.', ',');
+    const reading = dir === 'flat' ? `${r.label} est stable depuis 3 mois (${chg60 == null ? '–' : (chg60 > 0 ? '+' : '−') + f(chg60)} %) : aucune des deux jambes ne prend le dessus.`
+      : `${r.label} ${dir === 'up' ? 'progresse' : 'recule'} de ${f(chg60)} % sur 3 mois — ${dir === 'up' ? r.up : r.down}.`;
+    out.push({ id: r.id, label: r.label, num: r.num, den: r.den, last, chg20: pct(20), chg60, pos250: pos, dir, reading, series: pts });
+  }
+  return { updated: now, asOf: out.length ? isoDay(Math.max(...out.map(o => o.series[o.series.length - 1][0]))) : null, ratios: out };
+}
+
+module.exports = { RATIOS, RATIO_SLUGS, ratios, ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };

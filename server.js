@@ -304,6 +304,16 @@ function intermarket() {
   return interMemo.val;
 }
 
+// ---- Ratios intermarchés : séries calculées sur les séances en cache, mémorisées 5 minutes ----
+let ratioMemo = { at: 0, val: null };
+function ratiosData() {
+  if (ratioMemo.val && Date.now() - ratioMemo.at < 300e3) return ratioMemo.val;
+  const series = {};
+  for (const slug of INTER.RATIO_SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && cache.daily[m.code]; if (d && d.length > 60) series[slug] = d; }
+  ratioMemo = { at: Date.now(), val: INTER.ratios(series) };
+  return ratioMemo.val;
+}
+
 // ---- Protections : en-têtes de sécurité, limite de débit, validation des requêtes ----
 // CSP stricte : ni script ni style en ligne, aucune ressource tierce.
 const SECURITY_HEADERS = {
@@ -351,6 +361,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     }
     if (u.pathname === '/api/screener') return send(res, 200, JSON.stringify(screener()));
     if (u.pathname === '/api/intermarket') return send(res, 200, JSON.stringify(intermarket()));
+    if (u.pathname === '/api/ratios') return send(res, 200, JSON.stringify(ratiosData()));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');
       if (kind !== 'cpi' && kind !== 'rates') return send(res, 400, '{"error":"kind : cpi ou rates"}');

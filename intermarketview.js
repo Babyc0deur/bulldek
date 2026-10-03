@@ -46,9 +46,53 @@ function renderIntermarket(data, root, pick = {}) {
   paint();
 }
 
+// Ratios intermarchés : un graphique par ratio (valeur, moyenne sur 50 séances), période commune, indicateurs et lecture fournis par le serveur (/api/ratios).
+const RT_RANGES = [[12, '1a'], [36, '3a'], [60, '5a'], [120, '10a'], [0, 'Max']];
+function renderRatios(data, root, pick = {}) {
+  const B = BD, K = BD.tc(), $ = s => root.querySelector(s), list = (data && data.ratios) || [];
+  if (!list.length) { root.innerHTML = '<div class="sechead"><h2 class="sec">Ratios intermarchés</h2></div><div class="card"><p class="note">Ratios indisponibles pour le moment (historique de prix insuffisant).</p></div>'; return; }
+  let months = pick.months === undefined ? 36 : pick.months;
+  const fmt = v => (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : +v.toPrecision(3)), fr = v => String(fmt(v)).replace('.', ',');
+  const pct = v => (v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + ' %');
+  const cls = v => (v == null ? '' : v >= 0 ? 'pos' : 'neg');
+  root.innerHTML = `
+   <div class="sechead"><h2 class="sec">Ratios intermarchés</h2>
+     <div class="ranges" id="rtRng" role="group" aria-label="Période affichée">${RT_RANGES.map(([n, l]) => `<button class="btn ${n === months ? 'on' : ''}" data-m="${n}" aria-pressed="${n === months}">${l}</button>`).join('')}</div></div>
+   <div class="g2">${list.map(r => `<div class="card"><div class="leg"><b class="ttl">${r.label}</b><div class="legkey"><span><i class="sw line orange"></i>Ratio</span><span><i class="sw line dash"></i>Moyenne 50 séances</span></div></div>
+     <div class="kpis tri" id="rk-${r.id}"></div><canvas id="rc-${r.id}" role="img" aria-label="Évolution du ratio ${r.label} sur la période choisie, avec sa moyenne sur 50 séances."></canvas><p class="note" id="rr-${r.id}"></p></div>`).join('')}</div>
+   <p class="note">Un ratio monte quand le premier marché fait mieux que le second. Il dit lequel des deux domine, pas ce qui va se passer. Lecture sur 3 mois ; position sur 1 an = rang de la dernière valeur parmi les 250 dernières séances (0 % = plus bas, 100 % = plus haut). Information éducative, pas un conseil en investissement.</p>`;
+
+  const tip = t => new Date(t).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const items = list.map(r => {
+    const pts = r.series.map(([t, v]) => [t * 1e3, v]);
+    const ma = pts.map((p, i) => [p[0], i < 49 ? null : pts.slice(i - 49, i + 1).reduce((s, q) => s + q[1], 0) / 50]).filter(p => p[1] != null);
+    return { r, pts, ma, chart: B.lineChart($('#rc-' + r.id), { series: [], xmin: 0, xmax: 1, tipHead: tip, tipFmt: fmt, yFmt: fmt, height: 200 }) };
+  });
+  for (const { r } of items) {
+    $('#rk-' + r.id).innerHTML = `<div class="kpi"><span>Valeur</span><b>${fr(r.last)}</b></div><div class="kpi"><span>3 mois</span><b class="${cls(r.chg60)}">${pct(r.chg60)}</b></div><div class="kpi"><span>Position sur 1 an</span><b>${r.pos250 == null ? '–' : r.pos250 + ' %'}</b></div>`;
+    $('#rr-' + r.id).textContent = r.reading;
+  }
+  function paint() {
+    for (const { r, pts, ma, chart } of items) {
+      const end = pts[pts.length - 1][0], d = new Date(end); if (months) d.setUTCMonth(d.getUTCMonth() - months);
+      const x0 = months ? +d : pts[0][0], win = s => s.filter(p => p[0] >= x0);
+      const ticks = Array.from({ length: 6 }, (_, i) => { const x = x0 + (end - x0) * i / 5; return [x, new Date(x).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit', timeZone: 'UTC' })]; });
+      chart.redraw({ xmin: x0, xmax: end, xTicks: ticks, series: [{ name: r.label, color: K.accent, width: 1.8, data: win(pts) }, { name: 'Moyenne 50 séances', color: K.muted, width: 1.4, dash: [5, 4], data: win(ma) }] });
+    }
+  }
+  $('#rtRng').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; months = +b.dataset.m;
+    [...$('#rtRng').children].forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); paint();
+  };
+  paint();
+}
+
 async function bootIntermarket() {
   const root = document.querySelector('#app');
+  const ratiosRoot = document.querySelector('#ratios');
+  const ratiosReq = BD.json('/api/ratios').catch(() => null);                    // en parallèle ; son échec n'empêche pas la matrice
   try { renderIntermarket(await BD.json('/api/intermarket'), root); }
   catch { root.innerHTML = '<div id="msg" class="err">Données indisponibles pour le moment. Réessayez dans une minute.</div>'; }
+  if (ratiosRoot) { try { renderRatios(await ratiosReq, ratiosRoot); } catch { ratiosRoot.innerHTML = ''; } }
 }
 if (typeof document !== 'undefined' && document.body && document.body.dataset && document.body.dataset.page === 'intermarket') bootIntermarket();
