@@ -121,7 +121,21 @@ function build(series, corr, now = Date.now()) {
   }
   shifts.sort((x, y) => y.gap - x.gap);
 
-  return { updated: now, asOf: asOf ? isoDay(asOf) : null, assets, windows: WINDOWS, matrix, pairs, shifts: shifts.slice(0, 6) };
+  return { updated: now, asOf: asOf ? isoDay(asOf) : null, assets, windows: WINDOWS, matrix, pairs, shifts: shifts.slice(0, 6), regime: regime(maps['sp500'] && maps['10-year-t-note'] ? { r60: r('sp500', '10-year-t-note', 60), r250: r('sp500', '10-year-t-note', 250) } : null) };
+}
+
+// Régime inflation / déflation, lu sur le signe de la corrélation actions / prix des obligations (sur 60 séances, 1 an en repli) :
+// positive = les taux pèsent sur les deux (régime inflationniste), négative = les obligations servent de refuge (régime déflationniste / aversion au risque).
+function regime(c) {
+  if (!c) return null;
+  const r = Math.abs(c.r60 == null ? 0 : c.r60) >= 0.1 ? c.r60 : c.r250;
+  if (r == null) return null;
+  const f = v => (v == null ? '–' : v.toFixed(2).replace('.', ',').replace('-', '−'));
+  const base = { r60: c.r60, r250: c.r250 }, cite = `Corrélation actions / obligations : ${f(c.r60)} sur 60 séances, ${f(c.r250)} sur 1 an.`;
+  if (Math.abs(r) < 0.1) return { ...base, key: 'neutral', label: 'Régime indéterminé', text: `${cite} Aucun lien net : ni l'inflation ni la déflation ne domine les prix pour l'instant.` };
+  return r > 0
+    ? { ...base, key: 'inflation', label: 'Régime inflationniste', text: `${cite} Actions et obligations évoluent dans le même sens : ce sont les taux et l'inflation qui mènent le marché. Les obligations ne protègent pas les actions ; elles ont tendance à anticiper les retournements.` }
+    : { ...base, key: 'deflation', label: 'Régime déflationniste / aversion au risque', text: `${cite} Actions et obligations évoluent en sens inverse : la croissance et la peur d'un ralentissement mènent le marché. Les obligations jouent leur rôle de refuge ; une hausse des obligations pèse sur les actions.` };
 }
 
 // Grands moteurs auxquels on compare n'importe quel marché : actions, obligations, dollar, or, pétrole.
@@ -159,6 +173,8 @@ const RATIOS = [
   { id: 'sp500-petrole', num: 'sp500', den: 'crude-oil', label: 'S&P 500 / Pétrole',
     up: 'les actions surperforment le pétrole : la facture énergétique ne pèse pas sur le marché', down: 'le pétrole surperforme les actions : coûts de l\'énergie et inflation pèsent sur le marché' },
 ];
+RATIOS.push({ id: 'cuivre-obligations', num: 'copper', den: '10-year-t-note', label: 'Cuivre / T-Note 10 ans',
+    up: 'le cuivre surperforme les obligations : la demande industrielle et l\'inflation montent, signe d\'une économie solide', down: 'les obligations surperforment le cuivre : la demande industrielle faiblit, signe de ralentissement ou de déflation' });
 const RATIO_SLUGS = [...new Set(RATIOS.flatMap(r => [r.num, r.den]))];
 const sig = v => +v.toPrecision(5);                                       // 5 chiffres significatifs : les ratios bruts peuvent valoir 0,001 comme 80
 
@@ -183,4 +199,4 @@ function ratios(series, now = Date.now()) {
   return { updated: now, asOf: out.length ? isoDay(Math.max(...out.map(o => o.series[o.series.length - 1][0]))) : null, ratios: out };
 }
 
-module.exports = { RATIOS, RATIO_SLUGS, ratios, ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };
+module.exports = { regime, RATIOS, RATIO_SLUGS, ratios, ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };

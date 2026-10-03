@@ -11,7 +11,9 @@ function renderIntermarket(data, root, pick = {}) {
   const sgn = e => (e > 0 ? 'positive' : e < 0 ? 'négative' : 'variable');
   const ASOF = data.asOf ? new Date(data.asOf + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '–';
 
+  const rg = data.regime;
   root.innerHTML = `
+   ${rg ? `<div class="card im-regime" id="imRegime"><span class="sig sm wait">${rg.label}</span><p>${rg.text}</p></div>` : ''}
    <div class="sechead"><h2 class="sec">Matrice des corrélations</h2>
      <div class="ranges" id="imRng" role="group" aria-label="Fenêtre de calcul">${data.windows.map(w => `<button class="btn ${w === win ? 'on' : ''}" data-w="${w}" aria-pressed="${w === win}">${IM_WINDOW_LABELS[w]}</button>`).join('')}</div></div>
    <div class="card"><div class="tw"><table class="mon hm" id="imTbl"></table></div>

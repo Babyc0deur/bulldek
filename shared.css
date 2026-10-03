@@ -294,6 +294,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 .hm-n1{background:color-mix(in srgb,var(--redl) 20%,transparent)}.hm-n2{background:color-mix(in srgb,var(--redl) 38%,transparent)}
 .hm-na{color:var(--muted)}.hm-self{color:var(--muted)}
 .hm-key{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:.78rem}.hm-key span{padding:3px 10px;border-radius:6px;border:1px solid var(--line)}
+.im-regime{margin-bottom:14px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.im-regime p{margin:0;flex:1 1 280px;line-height:1.5}
 .im-shifts{margin:0;padding-left:18px}.im-shifts li{margin:6px 0;line-height:1.5}
 /* Ratios intermarchés : trois indicateurs sur une ligne dans chaque carte, plus compacts. */
 .kpis.tri{grid-template-columns:repeat(3,1fr);gap:8px}.kpis.tri .kpi{padding:8px 6px}.kpis.tri .kpi span{font-size:.66rem}.kpis.tri .kpi b{font-size:1.1rem}

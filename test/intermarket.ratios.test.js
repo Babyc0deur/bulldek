@@ -13,11 +13,11 @@ const get1 = d => d.ratios.find(r => r.id === 'nasdaq-sp500');
 
 test('définitions : ratios centrés sur les indices (aucun ratio autour de l\'or), marchés existants, lectures dans les deux sens', () => {
   const slugs = require('../markets.json').map(m => m.slug), ids = I.RATIOS.map(r => r.id);
-  assert.deepEqual(ids, ['actions-obligations', 'nasdaq-sp500', 'nasdaq-dow', 'sp500-dollar', 'sp500-petrole']); assert.equal(new Set(ids).size, ids.length);
+  assert.deepEqual(ids, ['actions-obligations', 'nasdaq-sp500', 'nasdaq-dow', 'sp500-dollar', 'sp500-petrole', 'cuivre-obligations']); assert.equal(new Set(ids).size, ids.length);
   for (const r of I.RATIOS) { assert.ok(slugs.includes(r.num) && slugs.includes(r.den) && r.num !== r.den); assert.ok(r.up.length > 20 && r.down.length > 20); assert.ok(!/scale/.test(Object.keys(r).join())); assert.ok(r.label.includes('/')); }
-  assert.ok(I.RATIOS.every(r => !['gold', 'silver', 'copper'].includes(r.num) && !['gold', 'silver', 'copper'].includes(r.den)), 'plus aucune jambe métal');
-  assert.ok(I.RATIOS.every(r => ['sp500', 'nasdaq-100'].includes(r.num)), 'le numérateur est toujours un indice');
-  assert.deepEqual([...I.RATIO_SLUGS].sort(), ['10-year-t-note', 'crude-oil', 'dow-jones', 'nasdaq-100', 'sp500', 'us-dollar']);
+  assert.ok(I.RATIOS.every(r => !['gold', 'silver'].includes(r.num) && !['gold', 'silver'].includes(r.den)), 'aucune jambe or ou argent ; le cuivre n\'apparaît que contre les obligations');
+  assert.ok(I.RATIOS.every(r => ['sp500', 'nasdaq-100'].includes(r.num) || r.id === 'cuivre-obligations'), 'le numérateur est un indice (sauf cuivre/obligations)');
+  assert.deepEqual([...I.RATIO_SLUGS].sort(), ['10-year-t-note', 'copper', 'crude-oil', 'dow-jones', 'nasdaq-100', 'sp500', 'us-dollar']);
 });
 
 test('valeur du ratio = marché 1 / marché 2 aux dates communes ; précision conservée pour de petites valeurs', () => {
@@ -120,4 +120,14 @@ test('page : conteneur des ratios présent, chargé indépendamment de la matric
   assert.match(fs.readFileSync(path.join(ROOT, 'intermarket.html'), 'utf8'), /<div id="ratios"><\/div>/);
   const v = fs.readFileSync(path.join(ROOT, 'intermarketview.js'), 'utf8');
   assert.match(v, /BD\.json\('\/api\/ratios'\)\.catch\(\(\) => null\)/);
+});
+
+test('régime : corrélation actions/obligations positive → inflationniste, négative → déflationniste, nulle → indéterminé, absente → null', () => {
+  assert.equal(I.regime({ r60: 0.4, r250: 0.2 }).key, 'inflation');
+  assert.equal(I.regime({ r60: -0.35, r250: 0.2 }).key, 'deflation');
+  assert.equal(I.regime({ r60: 0.05, r250: 0.02 }).key, 'neutral');
+  assert.equal(I.regime({ r60: 0.05, r250: -0.3 }).key, 'deflation', 'repli sur 1 an quand 60 séances est trop faible');
+  assert.equal(I.regime({ r60: null, r250: null }), null);
+  assert.equal(I.regime(null), null);
+  assert.match(I.regime({ r60: -0.35, r250: 0.2 }).text, /−0,35 sur 60 séances/);
 });
