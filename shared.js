@@ -30,7 +30,7 @@ const BD = (() => {
      <header class="top"><div class="wrap bar">
        <a class="logo" href="/">BULL<b>DESK</b></a>
        <div class="picker"><select id="mktSel" class="btn" aria-label="Actif">${options}</select></div>
-       <ul class="jump"><li><a href="/screener">${ICON_COT}Screener</a></li><li><a href="/compare?a=${m.slug}">${ICON_COT}Comparer</a></li><li><a href="/inflation">${ICON_COT}Inflation</a></li><li><a href="/taux">${ICON_COT}Taux</a></li><li><a href="/intermarket">${ICON_COT}Intermarket</a></li><li><a href="/strategie">${ICON_COT}Stratégie</a></li><li><a href="#sDeb">${ICON_SEA}Debrief</a></li><li><a href="#sSea">${ICON_SEA}Saisonnalité</a></li><li><a href="#sWr">${ICON_SEA}Williams %R</a></li><li><a href="#sCot">${ICON_COT}COT</a></li><li><a href="#sOi">${ICON_COT}OI</a></li></ul>
+       <ul class="jump"><li><a href="/screener">${ICON_COT}Screener</a></li><li><a href="/compare?a=${m.slug}">${ICON_COT}Comparer</a></li><li><a href="/inflation">${ICON_COT}Inflation</a></li><li><a href="/taux">${ICON_COT}Taux</a></li><li><a href="/intermarket">${ICON_COT}Intermarket</a></li><li><a href="/strategie">${ICON_COT}Stratégie</a></li><li><a href="#sDeb">${ICON_SEA}Debrief</a></li><li><a href="#sSea">${ICON_SEA}Saisonnalité</a></li><li><a href="#sWr">${ICON_SEA}W %R</a></li><li><a href="#sCot">${ICON_COT}COT</a></li><li><a href="#sOi">${ICON_COT}OI</a></li></ul>
      </div></header>
      <div class="wrap pagehead">
        <h1>${m.name}<button class="info" aria-label="Informations" id="infoBtn">i</button></h1>

@@ -2,7 +2,7 @@
 // paragraphe « Intermarchés » du débrief (indices uniquement) et lecture affichée sur la page.
 const test = require('node:test'), assert = require('node:assert/strict');
 const path = require('node:path');
-const I = require('../intermarket.js'), CALC = require('../calc.js'), { debrief } = require('../debrief.js'), { interStory } = require('../narrative.js');
+const I = require('../intermarket.js'), CALC = require('../calc.js'), { debrief } = require('../debrief.js'), { interStory, ratiosStory } = require('../narrative.js');
 const { render } = require('../tools/fake-dom.js');
 
 const rng = seed => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 - 0.5; };
@@ -91,4 +91,40 @@ test('page : lecture affichée sous chaque relation et chaque changement de rég
   assert.match(el('#imPairs').innerHTML, /Conforme à la théorie<\/span><br><small>Phrase de lecture\.<\/small>/);
   assert.match(el('#imPairs').innerHTML, /Lien faible en ce moment<\/span><\/td>/, 'pas de lecture : pas de saut de ligne ni de texte vide');
   assert.match(el('#imShifts').innerHTML, /<em>Sens du changement\.<\/em>/);
+});
+
+const ratio = (id, label, num, den, chg60, pos250, dir, reading) => ({ id, label, num, den, last: 1.23, chg20: 0, chg60, pos250, dir, reading });
+const RATIOS = [
+  ratio('nasdaq-sp500', 'Nasdaq 100 / S&P 500', 'nasdaq-100', 'sp500', 4.2, 95, 'up', 'Nasdaq 100 / S&P 500 progresse de 4,2 % sur 3 mois — le Nasdaq surperforme.'),
+  ratio('nasdaq-dow', 'Nasdaq 100 / Dow Jones', 'nasdaq-100', 'dow-jones', -3.1, 40, 'down', 'Nasdaq 100 / Dow Jones recule de 3,1 % sur 3 mois — la valeur surperforme.'),
+  ratio('sp500-dollar', 'S&P 500 / Dollar américain', 'sp500', 'us-dollar', 0.3, 50, 'flat', 'stable'),
+  ratio('cuivre-obligations', 'Cuivre / T-Note 10 ans', 'copper', '10-year-t-note', 9.4, 50, 'up', 'Cuivre / T-Note 10 ans progresse de 9,4 % sur 3 mois — demande industrielle en hausse.'),
+];
+const REGIME = { key: 'inflation', label: 'Régime inflationniste', r60: 0.42, r250: 0.24 };
+
+test('récit : régime et ratios cités, soutien du biais selon que l\'indice est numérateur ou dénominateur, ratios stables regroupés', () => {
+  const t = ratiosStory(row, market, { family: 'actions', drivers: [], regime: REGIME, ratios: RATIOS }, bias('up'));
+  assert.match(t, /Régime : régime inflationniste \(corrélation actions \/ obligations 0,42 sur 60 séances\) — les taux et l'inflation mènent le marché/);
+  assert.match(t, /Nasdaq 100 \/ S&P 500 progresse de 4,2 %[^.]*\. Il est proche de son plus haut sur 1 an \(95 %\)\. Cela joue plutôt en faveur de Nasdaq 100 E-Mini, dans le sens du biais de la semaine\./);
+  assert.match(t, /Nasdaq 100 \/ Dow Jones recule[^]*Cela joue plutôt contre Nasdaq 100 E-Mini, à l'inverse du biais de la semaine \(à surveiller\)\./);
+  assert.match(t, /Cuivre \/ T-Note 10 ans progresse de 9,4 % sur 3 mois — demande industrielle en hausse\.(?! Cela)/, 'ratio qui ne touche pas l\'indice : pas de soutien annoncé');
+  assert.match(t, /Ratios stables sur 3 mois : S&P 500 \/ Dollar américain\./);
+  const dw = ratiosStory(row, { slug: 'sp500', name: 'S&P 500', group: 'Indices' }, { drivers: [], ratios: [ratio('a', 'S&P 500 / Pétrole', 'sp500', 'crude-oil', -18.9, 5, 'down', 'recule')] }, bias('down'));
+  assert.match(dw, /Cela joue plutôt contre S&P 500, dans le sens du biais de la semaine/, 'biais baissier : un vent contraire va dans le sens du biais');
+});
+
+test('récit : régime neutre non cité ; sans moteurs ni ratios → paragraphe omis ; ratios seuls suffisent', () => {
+  assert.equal(ratiosStory(row, market, { drivers: [], regime: { key: 'neutral', label: 'x', r60: 0 }, ratios: [] }, bias('up')), null);
+  assert.equal(ratiosStory(row, market, { drivers: [] }, bias('up')), null);
+  assert.doesNotMatch(ratiosStory(row, market, { regime: { key: 'neutral', label: 'x', r60: 0 }, ratios: RATIOS }, bias('up')), /Régime/);
+});
+
+test('débrief indices : lignes détaillées du régime et des ratios dans la section Intermarchés, avec le récit', () => {
+  const r = { ...row, slug: 'nasdaq-100', fresh: 'ok', roll: false, price: 1, chgPct: 0.1, priceDate: 1, wr: -50, idx6: 50, idx36: 50, score: 0, sig: { cot: 0, season: 0, wr: 0, oi: 0 }, season: null, oi: null };
+  const d = debrief({ market, row: r, now: Date.parse('2026-09-28T08:00:00Z'), inter: { family: 'actions', drivers: [], regime: REGIME, ratios: RATIOS } });
+  const l = d.sections.find(s => s.title === 'Intermarchés').lines;
+  assert.ok(l.includes('Régime : Régime inflationniste (corrélation actions / obligations 0,42 sur 60 séances)'), l.join('|'));
+  assert.ok(l.includes('Ratio Nasdaq 100 / S&P 500 : 1,23, +4,20 % sur 3 mois, position sur 1 an 95 %'), l.join('|'));
+  assert.ok(l.includes('Ratio Nasdaq 100 / Dow Jones : 1,23, −3,10 % sur 3 mois, position sur 1 an 40 %'));
+  assert.match(d.story.find(p => p.title === 'Régime et ratios').text, /Nasdaq 100 \/ S&P 500 progresse/);
 });

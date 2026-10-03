@@ -175,9 +175,31 @@ function ratesStory(row, market, yields, daily, bias) {
 // Intermarchés (indices uniquement) : corrélations de l'indice avec les obligations, le dollar, l'or et le pétrole sur 60 séances, comparées à l'historique,
 // avec ce qu'elles signifient et ce que le mouvement récent de chaque moteur a changé pour l'indice. inter = INTER.profile(...) ; null → paragraphe omis.
 const isIndex = (row, market) => (row && row.group === 'Indices') || (market && I.familyOf(market.slug, market.group) === 'actions');
+// Régime inflation / déflation et ratios intermarchés (inter.regime, inter.ratios).
+// Un ratio « soutient » l'indice quand l'indice en est le numérateur et que le ratio monte (ou le dénominateur et qu'il baisse).
+function ratioStory(market, inter, b) {
+  const out = [], rg = inter.regime, rs = (inter.ratios || []).filter(r => r.dir);
+  if (rg && rg.key !== 'neutral') out.push(`Régime : ${rg.label.toLowerCase()} (corrélation actions / obligations ${f2(rg.r60)} sur 60 séances) — ${rg.key === 'inflation' ? 'les taux et l\'inflation mènent le marché, les obligations ne protègent pas les actions' : 'les obligations jouent leur rôle de refuge'}.`);
+  const moving = rs.filter(r => r.dir !== 'flat'), flat = rs.filter(r => r.dir === 'flat');
+  for (const r of moving) {
+    const own = r.num === market.slug ? 1 : r.den === market.slug ? -1 : 0, sup = own * (r.dir === 'up' ? 1 : -1);
+    let t = r.reading;
+    if (r.pos250 != null && (r.pos250 >= 90 || r.pos250 <= 10)) t += ` Il est proche de son ${r.pos250 >= 90 ? 'plus haut' : 'plus bas'} sur 1 an (${r.pos250} %).`;
+    if (sup) t += ` Cela ${sup > 0 ? 'joue plutôt en faveur de' : 'joue plutôt contre'} ${market.name}${b ? (sup === b ? ', dans le sens du biais de la semaine' : ', à l\'inverse du biais de la semaine (à surveiller)') : ''}.`;
+    out.push(t);
+  }
+  if (flat.length) out.push(`Ratios stables sur 3 mois : ${flat.map(r => r.label).join(', ')}.`);
+  return out.length ? out : null;
+}
+// Paragraphe distinct : régime et ratios (null hors indices ou sans donnée).
+function ratiosStory(row, market, inter, bias) {
+  if (!inter || !isIndex(row, market)) return null;
+  const r = ratioStory(market, inter, bias.week.key === 'up' ? 1 : bias.week.key === 'down' ? -1 : 0);
+  return r ? r.join(' ') : null;
+}
 function interStory(row, market, inter, bias) {
-  if (!inter || !inter.drivers || !inter.drivers.length || !isIndex(row, market)) return null;
-  const b = bias.week.key === 'up' ? 1 : bias.week.key === 'down' ? -1 : 0, ds = inter.drivers.filter(d => d.r60 != null);
+  if (!inter || !isIndex(row, market)) return null;
+  const b = bias.week.key === 'up' ? 1 : bias.week.key === 'down' ? -1 : 0, ds = (inter.drivers || []).filter(d => d.r60 != null);
   if (!ds.length) return null;
   const active = ds.filter(d => Math.abs(d.r60) >= 0.3 || d.flip), quiet = ds.filter(d => !active.includes(d));
   const out = [`${market.name} est comparé aux obligations, au dollar, à l'or et au pétrole sur les 60 dernières séances, puis à son historique.`];
@@ -239,7 +261,7 @@ function watch(row, bias) {
 }
 
 function narrative({ market, row, macro = {}, events = [], now, bias, win, session, daily, inter }) {
-  const m = macroStory(row, market, macro, bias), im = interStory(row, market, inter, bias);
+  const m = macroStory(row, market, macro, bias), im = interStory(row, market, inter, bias), rr = ratiosStory(row, market, inter, bias);
   return [
     { title: win && win.weekend ? 'Le point de clôture' : 'Le point du jour', text: situation(row, bias, win, session) },
     { title: 'Ce que disent les indicateurs entre eux', text: convergence(row) },
@@ -247,10 +269,11 @@ function narrative({ market, row, macro = {}, events = [], now, bias, win, sessi
     { title: 'Le contexte macro', text: m.text },
     { title: 'Rendements, volatilité et corrélations', text: ratesStory(row, market, macro.yields, daily, bias) },
     ...(im ? [{ title: 'Intermarchés', text: im }] : []),
+    ...(rr ? [{ title: 'Régime et ratios', text: rr }] : []),
     ...(win && win.weekend ? [{ title: 'Les annonces de la semaine écoulée', text: recapStory(row, market, events, now, win) }] : []),
     { title: 'Les annonces à venir', text: agendaStory(row, market, events, now, win) },
     { title: 'Ce qui ferait changer la lecture', text: watch(row, bias) },
   ];
 }
 
-module.exports = { interStory, surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };
+module.exports = { ratiosStory, interStory, surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };

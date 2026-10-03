@@ -112,8 +112,11 @@ function ratesLines(yields, daily) {
 
 // Lignes détaillées : corrélation de l'indice avec chaque moteur (indices uniquement, comme le paragraphe du récit).
 function interLines(inter, row, market) {
-  if (!inter || !inter.drivers || !((row && row.group === 'Indices') || market.group === 'Indices')) return [];
-  return inter.drivers.filter(d => d.r60 != null).map(d => `Corrélation 60 séances avec ${d.name} : ${f2(d.r60)} (historique : ${d.rMax == null ? '–' : f2(d.rMax)})${d.flip ? ' — lien inversé' : ''}`);
+  if (!inter || !((row && row.group === 'Indices') || market.group === 'Indices')) return [];
+  const pct = v => (v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + f2(Math.abs(v)) + ' %');
+  return [...(inter.drivers || []).filter(d => d.r60 != null).map(d => `Corrélation 60 séances avec ${d.name} : ${f2(d.r60)} (historique : ${d.rMax == null ? '–' : f2(d.rMax)})${d.flip ? ' — lien inversé' : ''}`),
+    ...(inter.regime ? [`Régime : ${inter.regime.label} (corrélation actions / obligations ${f2(inter.regime.r60)} sur 60 séances)`] : []),
+    ...(inter.ratios || []).map(r => `Ratio ${r.label} : ${r.last >= 100 ? r.last.toFixed(1).replace('.', ',') : String(+r.last.toPrecision(3)).replace('.', ',')}, ${pct(r.chg60)} sur 3 mois, position sur 1 an ${r.pos250 == null ? '–' : r.pos250 + ' %'}`)];
 }
 
 function debrief({ market, row, macro = {}, events = [], now = Date.now(), daily, inter }) {
