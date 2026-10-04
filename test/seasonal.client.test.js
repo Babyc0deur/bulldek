@@ -42,11 +42,11 @@ for (const unit of ['pts', 'pct']) {
   test(`tableaux (${unit}) : mensuel, par semaine et journalier identiques à la référence`, async () => {
     const got = (await run())[unit], ref = golden[unit];
     for (const t of ['monthly', 'weekly', 'daily']) {
-      const maxKey = Object.keys(got[t]).find(k => /^Max \(\d+ ans\)$/.test(k));             // période « Max » : ajoutée après les cinq périodes (tableaux mensuel et par semaine)
+      const maxKey = Object.keys(got[t]).find(k => !(k in ref[t]) && /^\d+ ans$/.test(k));       // période maximum (19 ans ici) : rangée entre 20 et 15 ans
       if (t !== 'daily') assert.ok(maxKey, `${t} : ligne Max`);
       assert.deepEqual(Object.keys(got[t]).filter(k => k !== maxKey), Object.keys(ref[t]), `${t} : lignes`);
       for (const [label, vals] of Object.entries(ref[t])) {
-        const row = t === 'daily' ? got[t][label].filter((_, i) => i !== 5) : got[t][label];      // journalier : la colonne Max s'intercale avant l'année en cours
+        const row = t === 'daily' ? got[t][label].filter((_, i) => i !== 1) : got[t][label];      // journalier : la colonne maximum (19 ans) s'intercale entre 20 et 15 ans
         assert.equal(row.length, vals.length, `${t}/${label} : colonnes`);
         vals.forEach((v, i) => close(row[i], v, TOL[unit], `${t}/${label}[${i}]`));
       }

@@ -139,7 +139,7 @@ async function renderCot(m, root) {
      <div class="g2">
      <div class="card insight"><div class="lbl">Long vs Short</div><div class="body" id="${id}LS"></div></div>
      <div class="card insight"><div class="lbl">Positions nettes ${tag}</div><div class="body"><canvas id="${id}Bars" class="mw640" role="img" aria-label="Positions nettes ${tag} par groupe de traders. Valeurs dans le tableau ci-dessus."></canvas></div></div></div>`;
-    defs.forEach(r => fig('#' + id + 'LS', r[0], [{ v: xn(r[1]), color: GRN }, ...(r[3] ? [{ v: xn(r[3]), color: GRY }] : []), { v: xn(r[2]), color: RED }]));
+    defs.forEach(r => fig('#' + id + 'LS', r[0], [{ v: xn(r[1]), color: GRN, name: 'Long' }, ...(r[3] ? [{ v: xn(r[3]), color: GRY, name: 'Spread' }] : []), { v: xn(r[2]), color: RED, name: 'Short' }]));
     B.bars($('#' + id + 'Bars'), defs.map((r, i) => ({ label: labels[i], v: xn(r[1]) - xn(r[2]), color: colors[i] })), 210);
   }
   const COL5 = [K.red, K.green, K.blue, K.purple, K.muted];

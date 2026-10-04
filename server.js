@@ -19,7 +19,7 @@ const STATIC = {
 const SCRIPTS = new Set(['intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -67,11 +67,23 @@ async function refreshWeekly(code) {
   // [timestamp, clôture, plus haut, plus bas]
   commit('weekly', code, res.timestamp.map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null));
 }
-async function refreshDaily(code) {
-  // Tout l'historique quotidien disponible (period1 = 1970) : avec range=max, Yahoo ne renvoie que des points mensuels.
-  const res = await getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(BY_CODE[code].yahoo)}?period1=0&period2=${Math.floor(Date.now() / 1e3) + 864e2}&interval=1d`).then(j => j.chart.result[0]), q = res.indicators.quote[0], r = v => +v.toFixed(4);
+// Historique quotidien : téléchargé en entier une fois, puis mis à jour en ne retéléchargeant que les dernières semaines (dailymerge.js).
+// Un téléchargement complet est refait si l'historique stocké est absent, trop court, ou si la source a corrigé des clôtures déjà connues.
+async function dailyRows(code, since) {
+  // period1 explicite : avec range=max, Yahoo ne renvoie que des points mensuels.
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(BY_CODE[code].yahoo)}?period1=${Math.max(0, Math.floor(since))}&period2=${Math.floor(Date.now() / 1e3) + 864e2}&interval=1d`;
+  const res = await getJSON(url).then(j => j.chart.result[0]), q = res.indicators.quote[0], r = v => +v.toFixed(4);
   // [timestamp, clôture, plus haut, plus bas]
-  commit('daily', code, res.timestamp.map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null).map(p => [p[0], r(p[1]), r(p[2]), r(p[3])]));
+  return (res.timestamp || []).map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null).map(p => [p[0], r(p[1]), r(p[2]), r(p[3])]);
+}
+async function refreshDaily(code) {
+  const since = DAILY_MERGE.sinceTs(cache.daily[code]);
+  if (since != null) {
+    const merged = DAILY_MERGE.merge(cache.daily[code], await dailyRows(code, since));
+    if (merged) { logV(BY_CODE[code].slug + ' : prix quotidiens mis à jour par fusion (' + (merged.length - cache.daily[code].length) + ' séances ajoutées)'); return commit('daily', code, merged); }
+    logV(BY_CODE[code].slug + ' : fusion impossible (historique corrigé à la source ?), retéléchargement complet');
+  }
+  commit('daily', code, await dailyRows(code, 0));
 }
 
 // ---- COT ----

@@ -9,8 +9,11 @@ async function renderSeasonal(m, root) {
   const MS = CALC.MONTH_STARTS, DM = CALC.DAYS_IN_MONTH, dm = DM[CM];
   const digits = lastClose < 10 ? 4 : lastClose < 1000 ? 2 : 1, fmt = v => B.dec(v, digits);
   const mname = B.MONTHS_L[CM], mshort = B.MONTHS[CM].toLowerCase();
-  const PER = [[20, K.gold], [15, K.accent], [10, K.purple], [5, K.bluel], [2, K.greenl], ['max', K.red]], SHOWN = [10, 5, 2];
-  const lab = n => (n === 'max' ? `Max (${S.meta.years} ans)` : n + ' ans');
+  const BASE = [[20, K.gold], [15, K.accent], [10, K.purple], [5, K.bluel], [2, K.greenl]], SHOWN = [10, 5, 2], YRS = S.meta.years;
+  const val = n => (n === 'max' ? YRS : n);
+  // Période « maximum » : toutes les années complètes disponibles, rangée par ordre décroissant parmi les autres ; omise si elle coïncide avec une période existante (ex. 20 ans pour le Dow).
+  const PER = (BASE.some(([n]) => n === YRS) ? BASE : [...BASE, ['max', K.red]]).sort((a, b) => val(b[0]) - val(a[0]));
+  const lab = n => val(n) + ' ans';
   const cls = v => v == null ? '' : v >= 0 ? 'pos' : 'neg';
 
   // ---- textes ----

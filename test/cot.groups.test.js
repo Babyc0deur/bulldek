@@ -59,3 +59,12 @@ test('le tableau et l\'analyse Disaggregated restent affichés (seul le graphiqu
   assert.equal(rec.gauges.length, 4);                                                       // commerciaux 6/36 mois + managed money 6/36 mois, calculé à part
   assert.deepEqual(rec.charts['#cNet'].series.map(s => s.name), ['Commerciaux', 'Petits traders']);
 });
+
+test('camemberts TFF et Disaggregated : toutes les tranches portent un nom, donc l\'infobulle du survol s\'affiche', async () => {
+  const calls = [];
+  await run({ name: 'Euro FX', code: '099741', slug: 'euro-fx', tff: true, disagg: true }, { pie: (c, slices) => calls.push(slices) });
+  assert.ok(calls.length >= 15, 'Legacy (5) + TFF (5) + Disaggregated (5) : ' + calls.length);
+  for (const s of calls) assert.ok(s.every(x => typeof x.name === 'string' && x.name), JSON.stringify(s));
+  const names = calls.map(s => s.map(x => x.name).join('/'));
+  assert.ok(names.filter(n => n === 'Long/Spread/Short').length >= 8 && names.includes('Long/Short'), names.join(' | '));
+});
