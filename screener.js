@@ -11,7 +11,7 @@
 
   const COLS = [
     ['name', 'Actif'], ['price', 'Prix'], ['chgPct', 'Jour'], ['idx6', 'COT 6 mois'],
-    ['season', `Saison ${data.week} (20 a. max) · (${data.day ? data.day.label : 'jour'})`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
+    ['season', `Saison ${data.week} (max) · (${data.day ? data.day.label : 'jour'})`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
   ];
   const dayCell = sd => !sd || sd.avgPct == null ? ' <span class="sd" title="Saisonnalité du jour : aucune donnée">(–)</span>' : ` <span class="sd ${sd.avgPct >= 0 ? 'pos' : 'neg'}" title="Saisonnalité du jour (${data.day ? data.day.label : ''}) : ${sd.up}/${sd.n} années en hausse">(${(sd.avgPct > 0 ? '+' : '') + sd.avgPct.toFixed(2)} %)</span>`;
   const val = (r, k) => k === 'season' ? r.season.avgPct : k === 'oi' ? (r.oi ? r.oi.chgPct : null) : r[k];

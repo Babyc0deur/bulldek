@@ -68,7 +68,8 @@ async function refreshWeekly(code) {
   commit('weekly', code, res.timestamp.map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null));
 }
 async function refreshDaily(code) {
-  const res = await yahoo(BY_CODE[code].yahoo, '20y', '1d'), q = res.indicators.quote[0], r = v => +v.toFixed(4);
+  // Tout l'historique quotidien disponible (period1 = 1970) : avec range=max, Yahoo ne renvoie que des points mensuels.
+  const res = await getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(BY_CODE[code].yahoo)}?period1=0&period2=${Math.floor(Date.now() / 1e3) + 864e2}&interval=1d`).then(j => j.chart.result[0]), q = res.indicators.quote[0], r = v => +v.toFixed(4);
   // [timestamp, clôture, plus haut, plus bas]
   commit('daily', code, res.timestamp.map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null).map(p => [p[0], r(p[1]), r(p[2]), r(p[3])]));
 }
@@ -250,7 +251,8 @@ function statusSummary() {
 // ---- Saisonnalité : rapport complet calculé une fois par jour et par marché, puis servi tel quel ----
 const seasonalMemo = new Map();
 function seasonalJson(code) {
-  const d = cache.daily[code];
+  const all = cache.daily[code], cap = SEASON_CAPS[(BY_CODE[code] || {}).slug];                // marché plafonné (Dow : 20 ans) : on ne garde que les années voulues
+  const d = all && cap ? all.filter(r => new Date(r[0] * 1e3).getUTCFullYear() >= new Date().getUTCFullYear() - cap) : all;
   if (!d || d.length < 300) return null;
   const now = new Date(), stamp = (cache.ts.daily[code] || 0) + '|' + d.length + '|' + now.toISOString().slice(0, 10);
   const hit = seasonalMemo.get(code);
@@ -269,6 +271,7 @@ function weekLabel(now) {
   return monday.getUTCMonth() === sunday.getUTCMonth() ? `${monday.getUTCDate()}–${sunday.getUTCDate()} ${mon(sunday)}` : `${monday.getUTCDate()} ${mon(monday)}–${sunday.getUTCDate()} ${mon(sunday)}`;
 }
 
+const SEASON_YEARS = 60, SEASON_CAPS = { 'dow-jones': 20 };               // plafond d'années par marché : le Dow est volontairement limité à 20 ans ; le Russell 2000 garde tout ce qui existe (8 ans)
 function screener() {
   if (scrMemo.val && Date.now() - scrMemo.at < 60e3) return scrMemo.val;
   const now = new Date(), nowY = now.getUTCFullYear();
@@ -281,8 +284,8 @@ function screener() {
     const net = cot.hist.map(r => r[1] - r[2]);                       // commerciaux : longs − shorts
     const TH = CALC.THRESHOLDS, idx6 = CALC.cotIndex(net, TH.cotShortWeeks).at(-1), idx36 = CALC.cotIndex(net, TH.cotLongWeeks).at(-1);
     const wr = CALC.williamsR(d, CALC.THRESHOLDS.wrPeriod), w = wr.at(-1)[1], last = d.at(-1), prev = d.at(-2);
-    const seasonDay = CALC.seasonalDay(d, day.iso, 20, nowY);
-    const season = CALC.seasonalWeek(d, now, 20, nowY);                 // jusqu'à 20 années complètes ; moins si l'historique du marché est plus court
+    const seasonDay = CALC.seasonalDay(d, day.iso, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);
+    const season = CALC.seasonalWeek(d, now, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);       // toutes les années complètes disponibles (≈ 25 pour les futures sur indices) ; moins si l'historique du marché est plus court
     // Future continu non ajusté : un saut de plus de 10 % en une séance signale en général un changement de contrat,
     // qui fausse le Williams %R pendant 14 séances. On l'indique et on neutralise ce signal (sauf crypto, très volatile).
     const recent = d.slice(-TH.rollWindow), roll = m.group !== 'Crypto' && recent.some((r, i) => i && Math.abs(r[1] / recent[i - 1][1] - 1) > TH.rollJump);

@@ -33,7 +33,7 @@ const wait = () => new Promise(r => setTimeout(r, 20));
 test('screener : colonne « Open interest » avec variation et lecture, et 4 points de confluence par ligne', async () => {
   const s = runScreener(ROWS); await wait();
   const html = s.el('#tbl').innerHTML;
-  assert.match(text(html.match(/<thead>[\s\S]*?<\/thead>/)[0]), /Saison 22–28 sept\. \(20 a\. max\) · \(lun 5 oct\) Open interest/);
+  assert.match(text(html.match(/<thead>[\s\S]*?<\/thead>/)[0]), /Saison 22–28 sept\. \(max\) · \(lun 5 oct\) Open interest/);
   const rows = rowsHtml(html); assert.equal(rows.length, 4);
   const a = rows.find(r => r.slug === 'a').html, b = rows.find(r => r.slug === 'b').html;
   assert.match(text(a), /\+10\.38 % Hausse confirmée/); assert.match(text(b), /\+4\.20 % Baisse confirmée/);

@@ -9,18 +9,19 @@ async function renderSeasonal(m, root) {
   const MS = CALC.MONTH_STARTS, DM = CALC.DAYS_IN_MONTH, dm = DM[CM];
   const digits = lastClose < 10 ? 4 : lastClose < 1000 ? 2 : 1, fmt = v => B.dec(v, digits);
   const mname = B.MONTHS_L[CM], mshort = B.MONTHS[CM].toLowerCase();
-  const PER = [[20, K.gold], [15, K.accent], [10, K.purple], [5, K.bluel], [2, K.greenl]], SHOWN = [10, 5, 2];
+  const PER = [[20, K.gold], [15, K.accent], [10, K.purple], [5, K.bluel], [2, K.greenl], ['max', K.red]], SHOWN = [10, 5, 2];
+  const lab = n => (n === 'max' ? `Max (${S.meta.years} ans)` : n + ' ans');
   const cls = v => v == null ? '' : v >= 0 ? 'pos' : 'neg';
 
   // ---- textes ----
-  B.setInfo(`<p>Les tendances saisonnières du <b>${m.name}</b> reposent sur le contrat future. Le rapport présente la saisonnalité sur les 20, 15, 10, 5 et 2 dernières années et montre comment le marché évolue à certaines périodes de l'année ou de la semaine dans un mois.</p>
+  B.setInfo(`<p>Les tendances saisonnières du <b>${m.name}</b> reposent sur le contrat future. Le rapport présente la saisonnalité sur les 20, 15, 10, 5 et 2 dernières années, ainsi que sur tout l'historique disponible (maximum) et montre comment le marché évolue à certaines périodes de l'année ou de la semaine dans un mois.</p>
     <p>En moyenne sur les 10 dernières années, le ${m.name} a varié de <b>${fmt(S.kpi.avg[10])}</b> en ${mname}.</p>
     <p>Repérez le mois le plus haussier ou le plus baissier de l'année et adaptez votre positionnement. Les données sont recalculées automatiquement à chaque nouvelle année complète. La saisonnalité est plus fiable combinée à l'analyse fondamentale.</p>`);
 
   // ---- gabarit ----
   const chip = (n, label, color, on) => `<button class="chip ${on ? 'on' : ''}" data-n="${n}" data-c="${color}" aria-pressed="${on}"><i></i>${label}</button>`;
-  const chipsY = PER.map(([n, c]) => chip(n, n + ' ans', c, SHOWN.includes(n))).join('') + chip('ytd', CY, K.text, true);
-  const chipsM = PER.filter(p => SHOWN.includes(p[0])).map(([n, c]) => chip(n, n + ' ans', c, true)).join('') + chip('cur', `${mname} ${CY}`, K.text, true);
+  const chipsY = PER.map(([n, c]) => chip(n, lab(n), c, SHOWN.includes(n))).join('') + chip('ytd', CY, K.text, true);
+  const chipsM = PER.filter(p => SHOWN.includes(p[0])).map(([n, c]) => chip(n, lab(n), c, true)).join('') + chip('cur', `${mname} ${CY}`, K.text, true);
   root.innerHTML = `
    <div class="sechead"><h2 class="sec">Saisonnalité annuelle – ${m.name}</h2></div>
    <div class="card"><div class="leg"><div class="chips" id="chipsY" role="group" aria-label="Périodes affichées">${chipsY}</div>
@@ -61,13 +62,13 @@ async function renderSeasonal(m, root) {
     bands: [{ x0: MS[CM], x1: MS[CM] + dm, color: B.alpha('gold', .12) }], vlines: [{ x: TODAY, color: K.redl }] });
   const points = (arr, x0 = 0) => (arr || []).map((v, i) => v == null ? null : [i + x0, v]).filter(Boolean);
   function paintYear() {
-    const s = PER.filter(([n]) => onY.has(n)).map(([n, c]) => ({ name: n + ' ans', color: c, width: 1.8, data: points(S.annual[n]) }));
+    const s = PER.filter(([n]) => onY.has(n)).map(([n, c]) => ({ name: lab(n), color: c, width: 1.8, data: points(S.annual[n]) }));
     if (onY.has('ytd') && S.ytd) s.push({ name: String(CY), color: K.text, width: 1.6, dash: [5, 4], data: points(S.ytd) });
     cy.redraw({ series: s });
   }
   const toggler = (set, key, paint) => e => {
     const b = e.target.closest('.chip'); if (!b) return;
-    const n = b.dataset.n === key ? key : +b.dataset.n;
+    const n = b.dataset.n === key || b.dataset.n === 'max' ? b.dataset.n : +b.dataset.n;
     set.has(n) ? set.delete(n) : set.add(n);
     b.classList.toggle('on'); b.setAttribute('aria-pressed', set.has(n)); paint();
   };
@@ -79,7 +80,7 @@ async function renderSeasonal(m, root) {
   const cm = B.lineChart($('#cMonth'), { series: [], xmin: 1, xmax: dm, xTicks: Array.from({ length: dm }, (_, i) => [i + 1, String(i + 1)]).filter(t => t[0] % 2 === 1),
     yFmt: v => +v.toFixed(2), tipHead: x => `${x} ${mshort}`, tipFmt: fmt, vlines: [{ x: Math.min(CD, dm), color: K.redl }], height: 300 });
   function paintMonth() {
-    const s = PER.filter(([n]) => onM.has(n)).map(([n, c]) => ({ name: n + ' ans', color: c, width: 1.8, data: points(S.month[n], 1) }));
+    const s = PER.filter(([n]) => onM.has(n)).map(([n, c]) => ({ name: lab(n), color: c, width: 1.8, data: points(S.month[n], 1) }));
     if (onM.has('cur') && S.month.cur) s.push({ name: `${B.MONTHS[CM]} ${CY}`, color: K.text, width: 1.6, dash: [5, 4], data: points(S.month.cur, 1) });
     cm.redraw({ series: s });
   }
@@ -99,7 +100,7 @@ async function renderSeasonal(m, root) {
   function paintTable() {
     const row = n => S.monthly[unit][n];
     $('#tbl').innerHTML = `<thead><tr><th scope="col">Période</th>${B.MONTHS.map((x, i) => `<th scope="col" class="${i === CM ? 'cur' : ''}">${x}</th>`).join('')}</tr></thead><tbody>`
-      + PER.map(([n]) => `<tr><th scope="row">${n} ans</th>${row(n).map((v, i) => `<td class="${cls(v)} ${i === CM ? 'cur' : ''}">${f2(v)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+      + PER.map(([n]) => `<tr><th scope="row">${lab(n)}</th>${row(n).map((v, i) => `<td class="${cls(v)} ${i === CM ? 'cur' : ''}">${f2(v)}</td>`).join('')}</tr>`).join('') + '</tbody>';
     bars($('#cMBars'), row(10), B.MONTHS, 210);
   }
   // Semaines du mois en cours : blocs 1-7, 8-14, 15-21, 22-28, 29-fin.
@@ -107,13 +108,13 @@ async function renderSeasonal(m, root) {
     const blocks = S.weekly.blocks, cur = S.weekly[unit].cur, curWk = blocks.findIndex(([a, e]) => CD >= a && CD <= e);
     const c = (v, k) => `${cls(v)} ${k === curWk ? 'cur' : ''}`;
     $('#wtbl').innerHTML = `<thead><tr><th scope="col">Période</th>${blocks.map(([a, e], k) => `<th scope="col" class="${k === curWk ? 'cur' : ''}">Sem. ${k + 1}<br><small>${a}–${e} ${mshort}</small></th>`).join('')}</tr></thead><tbody>`
-      + PER.map(([n]) => `<tr><th scope="row">${n} ans</th>${S.weekly[unit][n].map((v, k) => `<td class="${c(v, k)}">${f2(v)}</td>`).join('')}</tr>`).join('')
+      + PER.map(([n]) => `<tr><th scope="row">${lab(n)}</th>${S.weekly[unit][n].map((v, k) => `<td class="${c(v, k)}">${f2(v)}</td>`).join('')}</tr>`).join('')
       + (cur ? `<tr><th scope="row">${CY}</th>${cur.map((v, k) => `<td class="${c(v, k)}">${f2(v)}${k === curWk && v != null ? ' <small>(en cours)</small>' : ''}</td>`).join('')}</tr>` : '') + '</tbody>';
   }
   // Jours du mois : variation moyenne d'une séance à la précédente.
   function paintDays() {
     const D = S.daily[unit], cur = D.cur, today = i => i + 1 === CD ? 'cur' : '';
-    $('#dtbl').innerHTML = `<thead><tr><th scope="col">Jour</th>${PER.map(([n]) => `<th scope="col">${n} ans</th>`).join('')}<th scope="col">${CY}</th></tr></thead><tbody>`
+    $('#dtbl').innerHTML = `<thead><tr><th scope="col">Jour</th>${PER.map(([n]) => `<th scope="col">${lab(n)}</th>`).join('')}<th scope="col">${CY}</th></tr></thead><tbody>`
       + Array.from({ length: dm }, (_, i) => `<tr class="${today(i)}"><th scope="row">${i + 1} ${mshort}</th>${PER.map(([n]) => `<td class="${cls(D[n][i])} ${today(i)}">${f2(D[n][i])}</td>`).join('')}<td class="${cls(cur[i])} ${today(i)}">${f2(cur[i])}</td></tr>`).join('') + '</tbody>';
     bars($('#cDay'), D[10], Array.from({ length: dm }, (_, i) => String(i + 1)), 200);
   }

@@ -101,6 +101,7 @@
     const lastM = {}, byY = {}, byYM = {};
     D.forEach(p => { lastM[p.y * 12 + p.m] = p.c; (byY[p.y] ||= []).push(p); (byYM[p.y * 12 + p.m] ||= []).push(p); });
     const years = Object.keys(byY).map(Number).filter(y => y < CY && byY[y].length > 200).sort((a, b) => a - b);   // années complètes uniquement
+    const ALL = [...PERIODS, 'max'], take = n => years.slice(n === 'max' ? 0 : -n);                       // « max » : toutes les années complètes disponibles
 
     // remplit les trous par la dernière valeur connue ; au-delà de upTo (année ou mois en cours) on laisse vide
     const fill = (arr, upTo) => { let last = 0; for (let i = 0; i < arr.length; i++) { if (arr[i] == null) { arr[i] = upTo != null && i > upTo ? null : last; } else last = arr[i]; } return arr; };
@@ -119,22 +120,22 @@
       return fill(c, y === CY && mo === CM ? last : undefined);
     }
     const chg = (y, mo) => { const a = lastM[y * 12 + mo], b = lastM[y * 12 + mo - 1]; return a == null || b == null ? null : { pts: a - b, pct: (a - b) / b * 100 }; };
-    const avgMonth = (n, mo, key) => { const v = years.slice(-n).map(y => chg(y, mo)).filter(Boolean).map(c => c[key]); return v.length ? mean(v) : null; };
+    const avgMonth = (n, mo, key) => { const v = take(n).map(y => chg(y, mo)).filter(Boolean).map(c => c[key]); return v.length ? mean(v) : null; };
 
     // --- courbes annuelles ---
     const curves = {}; years.forEach(y => { curves[y] = yearCurve(y); });
     const annual = {}, month = {};
-    PERIODS.forEach(n => { const ys = years.slice(-n); annual[n] = ys.length ? avg(ys.map(y => curves[y])) : null; });
+    ALL.forEach(n => { const ys = take(n); annual[n] = ys.length ? avg(ys.map(y => curves[y])) : null; });
     const ytd = byY[CY] ? yearCurve(CY) : null;
 
     // --- mois en cours ---
     const mcur = monthCurve(CY, CM);
-    PERIODS.forEach(n => { const cs = years.slice(-n).map(y => monthCurve(y, CM)).filter(Boolean); month[n] = cs.length ? avg(cs) : null; });
+    ALL.forEach(n => { const cs = take(n).map(y => monthCurve(y, CM)).filter(Boolean); month[n] = cs.length ? avg(cs) : null; });
     month.cur = mcur;
 
     // --- tableau mensuel (12 mois × périodes) ---
     const monthly = { pts: {}, pct: {} };
-    PERIODS.forEach(n => { monthly.pts[n] = Array.from({ length: 12 }, (_, mo) => avgMonth(n, mo, 'pts')); monthly.pct[n] = Array.from({ length: 12 }, (_, mo) => avgMonth(n, mo, 'pct')); });
+    ALL.forEach(n => { monthly.pts[n] = Array.from({ length: 12 }, (_, mo) => avgMonth(n, mo, 'pts')); monthly.pct[n] = Array.from({ length: 12 }, (_, mo) => avgMonth(n, mo, 'pct')); });
 
     // --- semaines du mois en cours : blocs 1-7, 8-14, 15-21, 22-28, 29-fin ---
     const dm = DM[CM], blocks = []; for (let s = 1; s <= dm; s += 7) blocks.push([s, Math.min(s + 6, dm)]);
@@ -144,9 +145,9 @@
       return { pts: d, pct: d / base * 100 };
     });
     const weekly = { blocks, pts: {}, pct: {} };
-    PERIODS.forEach(n => {
+    ALL.forEach(n => {
       const acc = blocks.map(() => ({ pts: [], pct: [] }));
-      years.slice(-n).forEach(y => { const c = monthCurve(y, CM); if (c) weekVals(c, lastM[y * 12 + CM - 1], c.length).forEach((v, k) => { if (v) { acc[k].pts.push(v.pts); acc[k].pct.push(v.pct); } }); });
+      take(n).forEach(y => { const c = monthCurve(y, CM); if (c) weekVals(c, lastM[y * 12 + CM - 1], c.length).forEach((v, k) => { if (v) { acc[k].pts.push(v.pts); acc[k].pct.push(v.pct); } }); });
       weekly.pts[n] = acc.map(a => mean(a.pts)); weekly.pct[n] = acc.map(a => mean(a.pct));
     });
     const wc = mcur ? weekVals(mcur, lastM[CY * 12 + CM - 1], mcur.filter(v => v != null).length) : null;
@@ -157,7 +158,7 @@
     for (let i = 1; i < D.length; i++) { const p = D[i]; ((dayChg[p.y * 12 + p.m] ||= {})[p.day] = { pts: p.c - D[i - 1].c, pct: (p.c / D[i - 1].c - 1) * 100 }); }
     const daily = { pts: {}, pct: {} };
     ['pts', 'pct'].forEach(key => {
-      PERIODS.forEach(n => { daily[key][n] = Array.from({ length: dm }, (_, i) => { const v = years.slice(-n).map(y => dayChg[y * 12 + CM]?.[i + 1]?.[key]).filter(x => x != null); return v.length ? mean(v) : null; }); });
+      ALL.forEach(n => { daily[key][n] = Array.from({ length: dm }, (_, i) => { const v = take(n).map(y => dayChg[y * 12 + CM]?.[i + 1]?.[key]).filter(x => x != null); return v.length ? mean(v) : null; }); });
       daily[key].cur = Array.from({ length: dm }, (_, i) => dayChg[CY * 12 + CM]?.[i + 1]?.[key] ?? null);
     });
 

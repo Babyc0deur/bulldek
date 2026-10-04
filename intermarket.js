@@ -12,7 +12,7 @@ const ASSETS = [
   ['bitcoin', 'Bitcoin', 'BTC', 'Crypto'],
 ];
 const SLUGS = ASSETS.map(a => a[0]);
-const WINDOWS = [20, 60, 120, 250, 'max'];                               // séances ; « max » = tout l'historique commun (jusqu'à 20 ans)
+const WINDOWS = [20, 60, 120, 250, 'max'];                               // séances ; « max » = tout l'historique commun (tout l'historique disponible)
 
 // Relations classiques : signe attendu des rendements quotidiens (+1, −1) ou 0 quand la relation change selon le régime (inflation, fuite vers la qualité…).
 const PAIRS = [

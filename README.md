@@ -72,7 +72,7 @@ markets.json   les 37 marchés (généré par tools/build-markets.js)
 - **CFTC** (API publique Socrata) : rapports Legacy, TFF et Disaggregated, futures uniquement. Publiés le vendredi à 15h30 heure de New York, décalés d'un jour ouvré par un jour férié fédéral (règle vérifiée sur les 52 dates de 2026).
 - **FRED** (CSV public sans clé, une requête par série, 6 h de cache) : rendements américains 2, 5, 10 et 30 ans, courbe, taux réel, inflation anticipée, VIX, inflation PCE (et son indice cœur), indice dollar (DXY).
 - **OCDE** (SDMX public, limite d'appels stricte : une requête groupée par jeu, 24 h de cache) : inflation et taux. **Forex Factory** (flux JSON public non officiel) : calendrier des annonces, à remplacer par une source sous licence pour un usage public.
-- **Yahoo Finance** (accès non officiel) : futures continus, quotidiens (20 ans) et hebdomadaires (10 ans).
+- **Yahoo Finance** (accès non officiel) : futures continus, quotidiens (tout l'historique disponible, jusqu'à 25 ans ; le Dow Jones est limité à 20 ans pour la saisonnalité) et hebdomadaires (10 ans).
 
 ## Tests
 
