@@ -298,3 +298,4 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 .im-shifts{margin:0;padding-left:18px}.im-shifts li{margin:6px 0;line-height:1.5}
 /* Ratios intermarchés : trois indicateurs sur une ligne dans chaque carte, plus compacts. */
 .kpis.tri{grid-template-columns:repeat(3,1fr);gap:8px}.kpis.tri .kpi{padding:8px 6px}.kpis.tri .kpi span{font-size:.66rem}.kpis.tri .kpi b{font-size:1.1rem}
+.sd{font-size:.82em;white-space:nowrap}

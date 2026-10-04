@@ -11,8 +11,9 @@
 
   const COLS = [
     ['name', 'Actif'], ['price', 'Prix'], ['chgPct', 'Jour'], ['idx6', 'COT 6 mois'],
-    ['season', `Saison ${data.week} (20 a. max)`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
+    ['season', `Saison ${data.week} (20 a. max) · (${data.day ? data.day.label : 'jour'})`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
   ];
+  const dayCell = sd => !sd || sd.avgPct == null ? ' <span class="sd" title="Saisonnalité du jour : aucune donnée">(–)</span>' : ` <span class="sd ${sd.avgPct >= 0 ? 'pos' : 'neg'}" title="Saisonnalité du jour (${data.day ? data.day.label : ''}) : ${sd.up}/${sd.n} années en hausse">(${(sd.avgPct > 0 ? '+' : '') + sd.avgPct.toFixed(2)} %)</span>`;
   const val = (r, k) => k === 'season' ? r.season.avgPct : k === 'oi' ? (r.oi ? r.oi.chgPct : null) : r[k];
   let sk = 'score', dir = -1;
   const WARN = ' <span title="Saut probable dû au changement de contrat (future continu non ajusté) : Williams %R non fiable pendant 14 séances" class="warn-i">⚠</span>';
@@ -37,7 +38,7 @@
       return `<tr data-href="/market/${r.slug}"><td class="nm"><a href="/market/${r.slug}">${r.name}</a>${r.fresh !== 'ok' ? ' <span class="warn-i" role="img" title="Données à vérifier pour ce marché (voir sa fiche)" aria-label="Données à vérifier">⚠</span>' : ''}<small>${r.group}</small></td>
         <td>${px(r.price)}</td><td class="${r.chgPct >= 0 ? 'pos' : 'neg'}">${(r.chgPct > 0 ? '+' : '') + r.chgPct.toFixed(2)} %${r.roll ? WARN : ''}</td>
         <td>${cot(r.idx6)}</td>
-        <td class="${s.avgPct == null ? '' : s.avgPct >= 0 ? 'pos' : 'neg'}">${s.avgPct == null ? '–' : (s.avgPct > 0 ? '+' : '') + s.avgPct.toFixed(2) + ' %'} <small>${s.up}/${s.n} hausse</small></td>
+        <td class="${s.avgPct == null ? '' : s.avgPct >= 0 ? 'pos' : 'neg'}">${s.avgPct == null ? '–' : (s.avgPct > 0 ? '+' : '') + s.avgPct.toFixed(2) + ' %'} <small>${s.up}/${s.n} hausse</small>${dayCell(r.seasonDay)}</td>
         <td class="${r.oi && r.oi.chgPct >= 0 ? 'pos' : 'neg'}">${r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' % ' + pill(r.oi.label, r.sig.oi > 0 ? 'buy' : r.sig.oi < 0 ? 'sell' : 'wait') : '–'}</td>
         <td>${r.wr.toFixed(1)} ${r.roll ? pill('Non fiable', 'wait') + WARN : pill(z[0], z[1])}</td>
         <td class="cf">${dot(r.sig.cot, 'COT')}${dot(r.sig.season, 'Saison')}${dot(r.sig.wr, 'Williams %R')}${dot(r.sig.oi, 'Open interest')} ${pill((r.score > 0 ? '+' : '') + r.score, cls)}</td></tr>`;

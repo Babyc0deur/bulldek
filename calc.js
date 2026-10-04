@@ -46,6 +46,18 @@
     return { n: ch.length, avgPts: avg('pts'), avgPct: avg('pct'), up: ch.filter(c => c.pts > 0).length };
   }
 
+  // Saisonnalité journalière : variation de la séance du même jour du calendrier (mois + jour) sur les nYears dernières années complètes.
+  // target : date ISO (aaaa-mm-jj) de la séance visée. Seules comptent les années où le marché a coté ce jour-là (pas un week-end ni un jour férié) ;
+  // la variation est celle de la clôture de ce jour contre la clôture de la séance précédente.
+  function seasonalDay(rows, target, nYears, nowYear) {
+    const md = target.slice(5), cnt = {}, at = new Map();
+    rows.forEach((r, i) => { const d = new Date(r[0] * 1e3), y = d.getUTCFullYear(); cnt[y] = (cnt[y] || 0) + 1; at.set(d.toISOString().slice(0, 10), i); });
+    const years = Object.keys(cnt).map(Number).filter(y => y < nowYear && cnt[y] > 200).sort((a, b) => a - b).slice(-nYears);
+    const ch = years.map(y => { const i = at.get(y + '-' + md); return i == null || i < 1 ? null : { pts: rows[i][1] - rows[i - 1][1], pct: (rows[i][1] / rows[i - 1][1] - 1) * 100 }; }).filter(Boolean);
+    const avg = k => ch.length ? ch.reduce((s, c) => s + c[k], 0) / ch.length : null;
+    return { n: ch.length, avgPts: avg('pts'), avgPct: avg('pct'), up: ch.filter(c => c.pts > 0).length };
+  }
+
   // Seuils et paramètres de l'application : source unique. La page « À propos » les affiche depuis ici (le serveur les injecte),
   // si bien que la méthodologie publiée ne peut pas contredire le code.
   const THRESHOLDS = {
@@ -284,6 +296,6 @@
     return { ...sum, priceChgPct, reading: oiReading(priceChgPct, sum.chgPct) };
   }
 
-  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, seasonSignal, cotLabel,
+  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, seasonSignal, cotLabel,
     usFederalHolidays, cotReleaseDate, etInstant, nextCotRelease, alignByDay, alignedReturns, correlation, rollingCorrelation, rebase, performance };
 });

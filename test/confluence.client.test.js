@@ -8,7 +8,7 @@ const BD = new Function(read('shared.js') + '\nreturn BD;')();
 const text = h => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const mk = over => ({ slug: 'a', name: 'Alpha', group: 'Indices', price: 100, priceDate: 1, chgPct: 0.5, idx6: 50, idx36: 50, wr: -50, roll: false, fresh: 'ok',
-  season: { n: 10, avgPct: 1, up: 6 }, sig: { cot: 0, season: 1, wr: 0, oi: 1 }, score: 2,
+  season: { n: 10, avgPct: 1, up: 6 }, seasonDay: { n: 14, avgPct: -0.35, up: 6 }, sig: { cot: 0, season: 1, wr: 0, oi: 1 }, score: 2,
   oi: { last: 325784, chgPct: 10.38, priceChgPct: 2, key: 'trend-up', label: 'Hausse confirmée' }, ...over });
 const ROWS = [
   mk(), mk({ slug: 'b', name: 'Bravo', sig: { cot: -1, season: 0, wr: 0, oi: -1 }, score: -2, oi: { last: 1, chgPct: 4.2, priceChgPct: -2, key: 'trend-down', label: 'Baisse confirmée' } }),
@@ -21,7 +21,7 @@ function runScreener(rows) {
   const els = {}, handlers = {};
   const el = sel => els[sel] ||= { value: '', innerHTML: '', textContent: '', add() {}, addEventListener(t, f) { (handlers[sel] ||= {})[t] = f; }, insertAdjacentHTML() {}, remove() {} };
   const document = { querySelector: sel => (sel === '#miss' ? null : el(sel)) };
-  const fetch = async () => ({ json: async () => ({ week: '22–28 sept.', updated: Date.now(), rows }) });
+  const fetch = async () => ({ json: async () => ({ week: '22–28 sept.', day: { iso: '2026-10-05', label: 'lun 5 oct' }, updated: Date.now(), rows }) });
   globalThis.Option = function (t, v) { this.text = t; this.value = v; };
   const stubBD = { ...BD, freshness: () => {} };
   new Function('document', 'fetch', 'BD', 'CALC', 'Option', read('screener.js'))(document, fetch, stubBD, CALC, globalThis.Option);
@@ -33,7 +33,7 @@ const wait = () => new Promise(r => setTimeout(r, 20));
 test('screener : colonne « Open interest » avec variation et lecture, et 4 points de confluence par ligne', async () => {
   const s = runScreener(ROWS); await wait();
   const html = s.el('#tbl').innerHTML;
-  assert.match(text(html.match(/<thead>[\s\S]*?<\/thead>/)[0]), /Saison 22–28 sept\. \(20 a\. max\) Open interest/);
+  assert.match(text(html.match(/<thead>[\s\S]*?<\/thead>/)[0]), /Saison 22–28 sept\. \(20 a\. max\) · \(lun 5 oct\) Open interest/);
   const rows = rowsHtml(html); assert.equal(rows.length, 4);
   const a = rows.find(r => r.slug === 'a').html, b = rows.find(r => r.slug === 'b').html;
   assert.match(text(a), /\+10\.38 % Hausse confirmée/); assert.match(text(b), /\+4\.20 % Baisse confirmée/);
@@ -118,4 +118,12 @@ test('screener : catégorie « Indices » sélectionnée par défaut quand elle 
 test('screener : sans marché « Indices », aucune catégorie n\'est forcée', async () => {
   const s = runScreener([mk({ group: 'Metals' })]); await wait();
   assert.equal(s.el('#grp').value, '');
+});
+
+test('screener : saisonnalité du jour entre parenthèses, dans la colonne de la saison de la semaine ; absente → (–)', async () => {
+  const s = runScreener([mk(), mk({ slug: 'b', name: 'Bravo', seasonDay: { n: 0, avgPct: null, up: 0 } }), mk({ slug: 'c', name: 'Charlie', seasonDay: { n: 9, avgPct: 0.8, up: 6 } }), mk({ slug: 'd', name: 'Delta', seasonDay: undefined })]); await wait();
+  const rows = rowsHtml(s.el('#tbl').innerHTML), cell = slug => text(rows.find(r => r.slug === slug).html);
+  assert.match(cell('a'), /\+1\.00 % 6\/10 hausse \(\+?-0\.35 %\)/); assert.match(rows[0].html, /class="sd neg"[^>]*title="Saisonnalité du jour \(lun 5 oct\) : 6\/14 années en hausse"/);
+  assert.match(cell('b'), /\+1\.00 % 6\/10 hausse \(–\)/); assert.match(cell('c'), /\(\+0\.80 %\)/); assert.match(rows[2].html, /class="sd pos"/);
+  assert.match(cell('d'), /hausse \(–\)/);
 });

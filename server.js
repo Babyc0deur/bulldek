@@ -272,6 +272,8 @@ function weekLabel(now) {
 function screener() {
   if (scrMemo.val && Date.now() - scrMemo.at < 60e3) return scrMemo.val;
   const now = new Date(), nowY = now.getUTCFullYear();
+  const dow = now.getUTCDay(), target = new Date(Date.UTC(nowY, now.getUTCMonth(), now.getUTCDate() + (dow === 6 ? 2 : dow === 0 ? 1 : 0)));     // week-end : la prochaine séance est lundi
+  const day = { iso: target.toISOString().slice(0, 10), label: target.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(/\./g, '') };
   const rows = MARKETS.map(m => {
     const base = { slug: m.slug, name: m.name, group: m.group, fresh: status(m).level };
     const cot = cache.cot[m.code], d = cache.daily[m.code];
@@ -279,6 +281,7 @@ function screener() {
     const net = cot.hist.map(r => r[1] - r[2]);                       // commerciaux : longs − shorts
     const TH = CALC.THRESHOLDS, idx6 = CALC.cotIndex(net, TH.cotShortWeeks).at(-1), idx36 = CALC.cotIndex(net, TH.cotLongWeeks).at(-1);
     const wr = CALC.williamsR(d, CALC.THRESHOLDS.wrPeriod), w = wr.at(-1)[1], last = d.at(-1), prev = d.at(-2);
+    const seasonDay = CALC.seasonalDay(d, day.iso, 20, nowY);
     const season = CALC.seasonalWeek(d, now, 20, nowY);                 // jusqu'à 20 années complètes ; moins si l'historique du marché est plus court
     // Future continu non ajusté : un saut de plus de 10 % en une séance signale en général un changement de contrat,
     // qui fausse le Williams %R pendant 14 séances. On l'indique et on neutralise ce signal (sauf crypto, très volatile).
@@ -287,10 +290,10 @@ function screener() {
     const oiw = CALC.oiWeek(cot.hist, d);
     const sig = { cot: CALC.cotSignal(idx6), season: CALC.seasonSignal(season), wr: roll ? 0 : CALC.wrSignal(w), oi: roll || !oiw ? 0 : CALC.oiSignal(oiw.reading) };
     return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cot.hist.at(-1)[0], netC: net.at(-1),
-      idx6, idx36, wr: w, roll, season, sig, score: sig.cot + sig.season + sig.wr + sig.oi,
+      idx6, idx36, wr: w, roll, season, seasonDay, sig, score: sig.cot + sig.season + sig.wr + sig.oi,
       oi: oiw ? { last: oiw.last, chgPct: oiw.chgPct, priceChgPct: oiw.priceChgPct, key: oiw.reading.key, label: oiw.reading.label } : null };
   });
-  scrMemo = { at: Date.now(), val: { week: weekLabel(now), updated: Math.max(0, ...Object.values(cache.ts.daily)), rows } };
+  scrMemo = { at: Date.now(), val: { week: weekLabel(now), day, updated: Math.max(0, ...Object.values(cache.ts.daily)), rows } };
   return scrMemo.val;
 }
 
