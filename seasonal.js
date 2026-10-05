@@ -1,8 +1,8 @@
 // Saisonnalité : affichage seulement. Tous les calculs sont faits côté serveur (calc.js → /api/seasonal).
 async function renderSeasonal(m, root) {
   const B = BD, K = BD.tc(), $ = s => root.querySelector(s);
-  let S;
-  try { S = (await B.json('/api/seasonal?code=' + m.code)).report; if (!S) throw 0; }
+  let S, ADJ = null;
+  try { const j = await B.json('/api/seasonal?code=' + m.code); S = j.report; ADJ = j.adjusted || null; if (!S) throw 0; }
   catch { $('#msg').className = 'err'; $('#msg').textContent = 'Saisonnalité indisponible pour ce marché pour le moment. Réessayez dans une minute.'; return; }
 
   const { year: CY, month: CM, day: CD, doy: TODAY, lastClose } = S.meta;
@@ -17,7 +17,7 @@ async function renderSeasonal(m, root) {
   const cls = v => v == null ? '' : v >= 0 ? 'pos' : 'neg';
 
   // ---- textes ----
-  B.setInfo(`<p>Les tendances saisonnières du <b>${m.name}</b> reposent sur le contrat future. Le rapport présente la saisonnalité sur les 20, 15, 10, 5 et 2 dernières années, ainsi que sur tout l'historique disponible (maximum) et montre comment le marché évolue à certaines périodes de l'année ou de la semaine dans un mois.</p>
+  B.setInfo(`<p>Les tendances saisonnières du <b>${m.name}</b> reposent sur le contrat future${ADJ && ADJ.rolls ? `, corrigé des sauts de changement de contrat (${ADJ.rolls} échéances ajustées d'après l'indice au comptant)` : ''}. Le rapport présente la saisonnalité sur les 20, 15, 10, 5 et 2 dernières années, ainsi que sur tout l'historique disponible (maximum) et montre comment le marché évolue à certaines périodes de l'année ou de la semaine dans un mois.</p>
     <p>En moyenne sur les 10 dernières années, le ${m.name} a varié de <b>${fmt(S.kpi.avg[10])}</b> en ${mname}.</p>
     <p>Repérez le mois le plus haussier ou le plus baissier de l'année et adaptez votre positionnement. Les données sont recalculées automatiquement à chaque nouvelle année complète. La saisonnalité est plus fiable combinée à l'analyse fondamentale.</p>`);
 

@@ -13,7 +13,7 @@ async function renderConfluence(m) {
       <div class="confl-items">
         ${item('#sCot', r.sig.cot, 'COT · index 6 mois', CALC.cotLabel(r.idx6) + ' (' + r.idx6.toFixed(0) + ' %)', 'Signal ' + txt(r.sig.cot))}
         ${item('#sSea', r.sig.season, 'Saison · ' + d.week, (se.avgPct == null ? '–' : (se.avgPct > 0 ? '+' : '') + se.avgPct.toFixed(2) + ' %') + ' en moyenne', se.up + '/' + se.n + ' années hausse · ' + txt(r.sig.season))}
-        ${item('#sWr', r.sig.wr, 'Williams %R (14 j)', r.wr.toFixed(1) + ' · ' + (r.roll ? 'non fiable ⚠' : zone), r.roll ? 'Changement de contrat récent' : 'Signal ' + txt(r.sig.wr))}
+        ${item('#sWr', r.sig.wr, 'Williams %R (14 j)', r.wr.toFixed(1) + ' · ' + (r.roll ? 'non fiable ⚠' : zone), r.roll ? 'Changement de contrat récent' : (r.wrZone && !r.sig.wr ? 'Contre la tendance (moyenne 200 séances) : ignoré' : 'Signal ' + txt(r.sig.wr)) + (r.trend ? ' · tendance ' + (r.trend.up ? 'haussière' : 'baissière') : ''))}
         ${item('#sOi', r.sig.oi, 'Open interest · semaine', r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' %' : '–', r.oi ? r.oi.label + ' · ' + (r.roll ? 'neutralisé (changement de contrat)' : 'Signal ' + txt(r.sig.oi)) : 'Indisponible')}
       </div>
       <p class="confl-note">Repère pédagogique, pas un conseil en investissement. <a href="/screener">Voir tous les marchés →</a></p>`;

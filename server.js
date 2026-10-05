@@ -16,10 +16,10 @@ const STATIC = {
   '/shared.css': ['shared.css', 'text/css'],
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
 };
-const SCRIPTS = new Set(['intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
+const SCRIPTS = new Set(['reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -69,9 +69,9 @@ async function refreshWeekly(code) {
 }
 // Historique quotidien : téléchargé en entier une fois, puis mis à jour en ne retéléchargeant que les dernières semaines (dailymerge.js).
 // Un téléchargement complet est refait si l'historique stocké est absent, trop court, ou si la source a corrigé des clôtures déjà connues.
-async function dailyRows(code, since) {
+async function dailyRows(sym, since) {
   // period1 explicite : avec range=max, Yahoo ne renvoie que des points mensuels.
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(BY_CODE[code].yahoo)}?period1=${Math.max(0, Math.floor(since))}&period2=${Math.floor(Date.now() / 1e3) + 864e2}&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${Math.max(0, Math.floor(since))}&period2=${Math.floor(Date.now() / 1e3) + 864e2}&interval=1d`;
   const res = await getJSON(url).then(j => j.chart.result[0]), q = res.indicators.quote[0], r = v => +v.toFixed(4);
   // [timestamp, clôture, plus haut, plus bas]
   return (res.timestamp || []).map((t, i) => [t, q.close[i], q.high[i], q.low[i]]).filter(p => p[1] != null && p[2] != null && p[3] != null).map(p => [p[0], r(p[1]), r(p[2]), r(p[3])]);
@@ -79,16 +79,37 @@ async function dailyRows(code, since) {
 async function refreshDaily(code) {
   const since = DAILY_MERGE.sinceTs(cache.daily[code]);
   if (since != null) {
-    const merged = DAILY_MERGE.merge(cache.daily[code], await dailyRows(code, since));
+    const merged = DAILY_MERGE.merge(cache.daily[code], await dailyRows(BY_CODE[code].yahoo, since));
     if (merged) { logV(BY_CODE[code].slug + ' : prix quotidiens mis à jour par fusion (' + (merged.length - cache.daily[code].length) + ' séances ajoutées)'); return commit('daily', code, merged); }
     logV(BY_CODE[code].slug + ' : fusion impossible (historique corrigé à la source ?), retéléchargement complet');
   }
-  commit('daily', code, await dailyRows(code, 0));
+  commit('daily', code, await dailyRows(BY_CODE[code].yahoo, 0));
+}
+// Indice au comptant d'un future sur indice (adjust.js) : sert uniquement à mesurer les changements de contrat. Même mise à jour incrémentale ;
+// téléchargement complet depuis 2000 (les futures de Yahoo ne remontent pas plus loin).
+const CASH_FROM = Date.UTC(2000, 0, 1) / 1e3;
+async function refreshCash(code) {
+  const sym = ADJ.CASH[BY_CODE[code].slug]; if (!sym) return;
+  const old = cache.cash[code], since = DAILY_MERGE.sinceTs(old);
+  if (since != null) { const merged = DAILY_MERGE.merge(old, await dailyRows(sym, since)); if (merged) return commit('cash', code, merged); }
+  commit('cash', code, await dailyRows(sym, CASH_FROM));
+}
+// Série quotidienne ajustée des changements de contrat (indices) ou série brute (autres marchés), mémorisée tant que les données ne changent pas.
+// Sert aux calculs qui additionnent des variations : saisonnalité, tendance, corrélations, ratios, fiabilité des signaux. Les prix affichés restent bruts.
+const adjMemo = new Map();
+function adjusted(m) {
+  const d = cache.daily[m.code], c = cache.cash[m.code];
+  if (!d || !c || !ADJ.CASH[m.slug]) return { rows: d, rolls: [] };
+  const stamp = (cache.ts.daily[m.code] || 0) + '|' + d.length + '|' + (cache.ts.cash[m.code] || 0) + '|' + c.length, hit = adjMemo.get(m.code);
+  if (hit && hit.stamp === stamp) return hit.val;
+  const val = ADJ.rollAdjust(d, c);
+  adjMemo.set(m.code, { stamp, val });
+  return val;
 }
 
 // ---- COT ----
 async function fetchCot(dataset, fields, code) {
-  const url = `${CFTC}${dataset}.json?$select=${fields.join(',')}&$order=report_date_as_yyyy_mm_dd DESC&$limit=800&$where=`
+  const url = `${CFTC}${dataset}.json?$select=${fields.join(',')}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1500&$where=`
     + encodeURIComponent(`cftc_contract_market_code='${code}'`);
   return getJSON(url);
 }
@@ -131,7 +152,7 @@ async function fresh(name, code, ttl, fn) {
 function cacheSummary() {
   const age = ms => (ms < 3600e3 ? Math.round(ms / 60e3) + ' min' : ms < 48 * 3600e3 ? (ms / 3600e3).toFixed(1) + ' h' : Math.round(ms / 864e5) + ' j');
   const now = Date.now();
-  for (const name of ['daily', 'weekly', 'cot', 'tff', 'disagg']) {
+  for (const name of ['daily', 'cash', 'weekly', 'cot', 'tff', 'disagg']) {
     const ts = Object.values(cache.ts[name] || {}).filter(Boolean);
     logV('cache ' + name + ' : ' + ts.length + ' marché' + (ts.length > 1 ? 's' : '') + (ts.length ? ', mis à jour il y a ' + age(now - Math.max(...ts)) + ' (le plus ancien : ' + age(now - Math.min(...ts)) + ')' : ' — vide'));
   }
@@ -143,9 +164,10 @@ async function refreshAll() {
   const t0 = Date.now(); let fails = 0;
   logV('rafraîchissement : ' + MARKETS.length + ' marchés');
   const dailyDue = m => !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || now - (cache.ts.daily[m.code] || 0) > DAILY_MS;
+  const cashDue = m => ADJ.CASH[m.slug] && (!cache.cash[m.code] || now - (cache.ts.cash[m.code] || 0) > DAILY_MS);
   for (const m of MARKETS) {
     const done = [];
-    for (const [name, fn] of [['weekly', refreshWeekly], ...(dailyDue(m) ? [['daily', refreshDaily]] : []), ['cot', refreshCot], ...(m.tff ? [['tff', refreshTff]] : []), ...(m.disagg ? [['disagg', refreshDisagg]] : [])]) {
+    for (const [name, fn] of [['weekly', refreshWeekly], ...(dailyDue(m) ? [['daily', refreshDaily]] : []), ...(cashDue(m) ? [['cash', refreshCash]] : []), ['cot', refreshCot], ...(m.tff ? [['tff', refreshTff]] : []), ...(m.disagg ? [['disagg', refreshDisagg]] : [])]) {
       const t1 = Date.now();
       try { await fn(m.code); done.push(name + ' ' + (Date.now() - t1) + ' ms'); } catch (e) { fails++; noteError(name, m.code, e); log(m.slug, name, 'échec:', e.message); }
     }
@@ -236,7 +258,7 @@ function docValues() {
   const T = CALC.THRESHOLDS;
   return { REFRESH_HOURS: REFRESH_MS / 36e5, COT_SHORT_WEEKS: T.cotShortWeeks, COT_LONG_WEEKS: T.cotLongWeeks, COT_BUY: T.cotBuy, COT_SELL: T.cotSell,
     WR_PERIOD: T.wrPeriod, WR_HIGH: T.wrHigh, WR_LOW: T.wrLow, SEASON_MIN_YEARS: T.seasonMinYears, SEASON_HIT_PCT: Math.round(T.seasonHitRate * 100),
-    ROLL_PCT: Math.round(T.rollJump * 100), ROLL_WINDOW: T.rollWindow, CONF: T.confluenceStrong, OI_FLAT_PCT: T.oiFlatPct, PRICE_FLAT_PCT: T.priceFlatPct,
+    ROLL_PCT: Math.round(T.rollJump * 100), ROLL_WINDOW: T.rollWindow, CONF: T.confluenceStrong, TREND_SMA: T.trendSma, OI_FLAT_PCT: T.oiFlatPct, PRICE_FLAT_PCT: T.priceFlatPct,
     STALE_SESSION_DAYS: LIMITS.sessionMaxAge / 864e5, FETCH_MAX_HOURS: LIMITS.fetchMaxAge / 36e5, GRACE_HOURS: LIMITS.cotOverdueGrace / 36e5 };
 }
 function docPage(file) {
@@ -263,13 +285,13 @@ function statusSummary() {
 // ---- Saisonnalité : rapport complet calculé une fois par jour et par marché, puis servi tel quel ----
 const seasonalMemo = new Map();
 function seasonalJson(code) {
-  const all = cache.daily[code], cap = SEASON_CAPS[(BY_CODE[code] || {}).slug];                // marché plafonné (Dow : 20 ans) : on ne garde que les années voulues
+  const m0 = BY_CODE[code], adj = m0 ? adjusted(m0) : { rows: cache.daily[code], rolls: [] }, all = adj.rows, cap = SEASON_CAPS[(m0 || {}).slug];                // marché plafonné (Dow : 20 ans) : on ne garde que les années voulues
   const d = all && cap ? all.filter(r => new Date(r[0] * 1e3).getUTCFullYear() >= new Date().getUTCFullYear() - cap) : all;
   if (!d || d.length < 300) return null;
   const now = new Date(), stamp = (cache.ts.daily[code] || 0) + '|' + d.length + '|' + now.toISOString().slice(0, 10);
   const hit = seasonalMemo.get(code);
   if (hit && hit.stamp === stamp) return hit.json;
-  const json = '{"updated":' + (cache.ts.daily[code] || 0) + ',"report":' + JSON.stringify(CALC.seasonalReport(d, now)) + '}';
+  const json = '{"updated":' + (cache.ts.daily[code] || 0) + ',"adjusted":' + JSON.stringify({ rolls: adj.rolls.length, last: adj.rolls.at(-1) || null }) + ',"report":' + JSON.stringify(CALC.seasonalReport(d, now)) + '}';
   seasonalMemo.set(code, { stamp, json });
   return json;
 }
@@ -283,6 +305,10 @@ function weekLabel(now) {
   return monday.getUTCMonth() === sunday.getUTCMonth() ? `${monday.getUTCDate()}–${sunday.getUTCDate()} ${mon(sunday)}` : `${monday.getUTCDate()} ${mon(monday)}–${sunday.getUTCDate()} ${mon(sunday)}`;
 }
 
+// Source du signal COT de la confluence, par marché (reliability.js → COT_SOURCES). Par défaut : commerciaux du rapport Legacy.
+// Le rapport TFF (asset managers, fonds à levier) a été testé sur les indices (page Fiabilité) : il n'a pas fait mieux que le Legacy, il reste donc affiché
+// à titre d'information. Pour basculer un marché : { 'sp500': 'tff-am' }.
+const COT_SOURCE = {};
 const SEASON_YEARS = 60, SEASON_CAPS = { 'dow-jones': 20 };               // plafond d'années par marché : le Dow est volontairement limité à 20 ans ; le Russell 2000 garde tout ce qui existe (8 ans)
 function screener() {
   if (scrMemo.val && Date.now() - scrMemo.at < 60e3) return scrMemo.val;
@@ -293,18 +319,24 @@ function screener() {
     const base = { slug: m.slug, name: m.name, group: m.group, fresh: status(m).level };
     const cot = cache.cot[m.code], d = cache.daily[m.code];
     if (!cot || !d || d.length < 30 || d[0].length < 4) return { ...base, missing: true };
-    const net = cot.hist.map(r => r[1] - r[2]);                       // commerciaux : longs − shorts
-    const TH = CALC.THRESHOLDS, idx6 = CALC.cotIndex(net, TH.cotShortWeeks).at(-1), idx36 = CALC.cotIndex(net, TH.cotLongWeeks).at(-1);
+    const src = COT_SOURCE[m.slug] && cache.tff[m.code] ? COT_SOURCE[m.slug] : 'legacy', tff = cache.tff[m.code] && cache.tff[m.code].hist;
+    const cs = REL.cotSeries(src, cot.hist, tff) || REL.cotSeries('legacy', cot.hist, tff, 1);
+    if (!cs) return { ...base, missing: true };
+    const cl = cs.at(-1), net = cs.map(r => r.net);
+    const TH = CALC.THRESHOLDS, idx6 = cl.idx6, idx36 = cl.idx36;
+    // Lectures TFF (marchés financiers) : affichées à titre d'information, hors confluence sauf configuration contraire.
+    const tffIdx = tff ? Object.fromEntries(['tff-am', 'tff-lev'].map(s => { const c = REL.cotSeries(s, cot.hist, tff); return [s, c ? Math.round(c.at(-1).idx6) : null]; })) : null;
+    const A = adjusted(m).rows || d, ma = CALC.sma(A).at(-1), trend = ma == null ? null : { ma: +ma.toFixed(4), pct: +((A.at(-1)[1] / ma - 1) * 100).toFixed(2), up: A.at(-1)[1] > ma };
     const wr = CALC.williamsR(d, CALC.THRESHOLDS.wrPeriod), w = wr.at(-1)[1], last = d.at(-1), prev = d.at(-2);
-    const seasonDay = CALC.seasonalDay(d, day.iso, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);
-    const season = CALC.seasonalWeek(d, now, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);       // toutes les années complètes disponibles (≈ 25 pour les futures sur indices) ; moins si l'historique du marché est plus court
+    const seasonDay = CALC.seasonalDay(A, day.iso, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);
+    const season = CALC.seasonalWeek(A, now, SEASON_CAPS[m.slug] || SEASON_YEARS, nowY);       // toutes les années complètes disponibles (≈ 25 pour les futures sur indices) ; moins si l'historique du marché est plus court
     // Future continu non ajusté : un saut de plus de 10 % en une séance signale en général un changement de contrat,
     // qui fausse le Williams %R pendant 14 séances. On l'indique et on neutralise ce signal (sauf crypto, très volatile).
     const recent = d.slice(-TH.rollWindow), roll = m.group !== 'Crypto' && recent.some((r, i) => i && Math.abs(r[1] / recent[i - 1][1] - 1) > TH.rollJump);
     // Open interest : lecture de la dernière semaine (prix du mardi contre open interest). Un changement de contrat récent fausse la variation de prix : signal neutralisé.
     const oiw = CALC.oiWeek(cot.hist, d);
-    const sig = { cot: CALC.cotSignal(idx6), season: CALC.seasonSignal(season), wr: roll ? 0 : CALC.wrSignal(w), oi: roll || !oiw ? 0 : CALC.oiSignal(oiw.reading) };
-    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cot.hist.at(-1)[0], netC: net.at(-1),
+    const sig = { cot: REL.cotSig(src, idx6), season: CALC.seasonSignal(season), wr: roll ? 0 : CALC.wrTrendSignal(w, A.at(-1)[1], ma), oi: roll || !oiw ? 0 : CALC.oiSignal(oiw.reading) };
+    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cl.date, netC: net.at(-1), cotSource: src, cotLabel: REL.COT_SOURCES[src].label, tffIdx, trend, wrZone: CALC.wrSignal(w),
       idx6, idx36, wr: w, roll, season, seasonDay, sig, score: sig.cot + sig.season + sig.wr + sig.oi,
       oi: oiw ? { last: oiw.last, chgPct: oiw.chgPct, priceChgPct: oiw.priceChgPct, key: oiw.reading.key, label: oiw.reading.label } : null };
   });
@@ -317,7 +349,7 @@ let interMemo = { at: 0, val: null };
 function intermarket() {
   if (interMemo.val && Date.now() - interMemo.at < 300e3) return interMemo.val;
   const series = {};
-  for (const slug of INTER.SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && cache.daily[m.code]; if (d && d.length > 60) series[slug] = d; }
+  for (const slug of INTER.SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && adjusted(m).rows; if (d && d.length > 60) series[slug] = d; }
   interMemo = { at: Date.now(), val: INTER.build(series, CALC.correlation) };
   return interMemo.val;
 }
@@ -327,9 +359,34 @@ let ratioMemo = { at: 0, val: null };
 function ratiosData() {
   if (ratioMemo.val && Date.now() - ratioMemo.at < 300e3) return ratioMemo.val;
   const series = {};
-  for (const slug of INTER.RATIO_SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && cache.daily[m.code]; if (d && d.length > 60) series[slug] = d; }
+  for (const slug of INTER.RATIO_SLUGS) { const m = MARKETS.find(x => x.slug === slug), d = m && adjusted(m).rows; if (d && d.length > 60) series[slug] = d; }
   ratioMemo = { at: Date.now(), val: INTER.ratios(series) };
   return ratioMemo.val;
+}
+
+// ---- Volatilité (vol.js : VIX, VIX 3 mois, volatilité réalisée du S&P 500) et dates clés (keydates.js) ----
+function volData() {
+  const y = cache.macro.yields || {}, sp = MARKETS.find(m => m.slug === 'sp500');
+  return VOL.volatility({ vix: y.vix, vix3m: y.vix3m, spx: sp && adjusted(sp).rows });
+}
+
+// ---- Fiabilité des signaux (reliability.js) : historique rejoué semaine par semaine pour chaque marché ----
+let relMemo = { at: 0, stamp: '', val: null };
+function reliabilityData() {
+  const stamp = MARKETS.map(m => (cache.ts.daily[m.code] || 0) + ':' + (cache.ts.cot[m.code] || 0) + ':' + (cache.ts.cash[m.code] || 0)).join(',');
+  if (relMemo.val && relMemo.stamp === stamp && Date.now() - relMemo.at < 12 * 3600e3) return relMemo.val;
+  const t0 = Date.now(), markets = [];
+  for (const m of MARKETS) {
+    const raw = cache.daily[m.code], cot = cache.cot[m.code];
+    if (!raw || !cot) continue;
+    const src = COT_SOURCE[m.slug] && cache.tff[m.code] ? COT_SOURCE[m.slug] : 'legacy';
+    const res = REL.summarize(REL.samples({ rows: adjusted(m).rows, raw, legacyHist: cot.hist, tffHist: cache.tff[m.code] && cache.tff[m.code].hist, cotSource: src,
+      seasonCap: SEASON_CAPS[m.slug] || SEASON_YEARS, crypto: m.group === 'Crypto' }), src);
+    if (res) markets.push({ slug: m.slug, name: m.name, group: m.group, adjusted: !!(ADJ.CASH[m.slug] && cache.cash[m.code]), ...res });
+  }
+  logV('fiabilité des signaux : ' + markets.length + ' marchés rejoués en ' + (Date.now() - t0) + ' ms');
+  relMemo = { at: Date.now(), stamp, val: { updated: Date.now(), horizons: REL.HORIZONS, labels: REL.LABELS, minCases: 15, markets } };
+  return relMemo.val;
 }
 
 // ---- Protections : en-têtes de sécurité, limite de débit, validation des requêtes ----
@@ -380,6 +437,9 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/api/screener') return send(res, 200, JSON.stringify(screener()));
     if (u.pathname === '/api/intermarket') return send(res, 200, JSON.stringify(intermarket()));
     if (u.pathname === '/api/ratios') return send(res, 200, JSON.stringify(ratiosData()));
+    if (u.pathname === '/api/reliability') return send(res, 200, JSON.stringify(reliabilityData()));
+    if (u.pathname === '/api/volatility') { await macroData('yields').catch(() => {}); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.yields || 0, vol: volData() })); }
+    if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6)));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');
       if (kind !== 'cpi' && kind !== 'rates') return send(res, 400, '{"error":"kind : cpi ou rates"}');
@@ -398,8 +458,8 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       for (const n of ['cpi', 'rates']) macroData(n).catch(() => {});                        // l'OCDE est lente et capricieuse : le debrief n'attend pas, il utilise ce qui est en cache
       const row = screener().rows.find(r => r.slug === m.slug);
       let inter = null;                                                           // intermarchés : indices uniquement
-      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = cache.daily[mm.code]; } inter = { ...(INTER.profile(m, series, CALC.correlation) || {}), regime: intermarket().regime, ratios: ratiosData().ratios.map(({ series: _s, ...r }) => r) }; }
-      return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: cache.daily[m.code], inter })));
+      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = adjusted(mm).rows; } inter = { vol: volData(), keyDates: KEYDATES.keyDates(Date.now(), 2).dates, ...(INTER.profile(m, series, CALC.correlation) || {}), regime: intermarket().regime, ratios: ratiosData().ratios.map(({ series: _s, ...r }) => r) }; }
+      return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: adjusted(m).rows, inter })));
     }
     if (u.pathname.startsWith('/api/')) {
       const m = BY_CODE[u.searchParams.get('code')];
@@ -431,6 +491,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/themes') return send(res, 200, fs.readFileSync(path.join(__dirname, 'themes.html')), 'text/html');
     if (u.pathname === '/inflation' || u.pathname === '/taux') return send(res, 200, fs.readFileSync(path.join(__dirname, u.pathname === '/inflation' ? 'inflation.html' : 'rates.html')), 'text/html');
     if (u.pathname === '/strategie') return send(res, 200, docPage('strategy.html'), 'text/html');
+    if (u.pathname === '/fiabilite') return send(res, 200, fs.readFileSync(path.join(__dirname, 'reliability.html')), 'text/html');
     if (u.pathname === '/intermarket') return send(res, 200, fs.readFileSync(path.join(__dirname, 'intermarket.html')), 'text/html');
     if (u.pathname === '/compare') return send(res, 200, fs.readFileSync(path.join(__dirname, 'compare.html')), 'text/html');
     if (SCRIPTS.has(section) && !slug) return send(res, 200, fs.readFileSync(path.join(__dirname, section)), 'text/javascript');
@@ -450,7 +511,7 @@ server.listen(PORT, () => { log('BullDesk sur le port', PORT); cacheSummary(); l
 process.on('unhandledRejection', e => log('rejet non géré :', e && e.message));
 
 // Rafraîchissement automatique : au démarrage si le cache est périmé, puis à intervalle régulier.
-const stale = MARKETS.some(m => Date.now() - (cache.ts.weekly[m.code] || 0) > REFRESH_MS || !cache.weekly[m.code] || !cache.cot[m.code] || !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || (m.disagg && !cache.disagg[m.code]));
+const stale = MARKETS.some(m => Date.now() - (cache.ts.weekly[m.code] || 0) > REFRESH_MS || !cache.weekly[m.code] || !cache.cot[m.code] || !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || (m.disagg && !cache.disagg[m.code]) || (ADJ.CASH[m.slug] && !cache.cash[m.code]));
 if (!process.env.NO_REFRESH) {
   logV(stale ? 'cache incomplet ou périmé : mise à jour au démarrage' : 'cache à jour : prochaine mise à jour dans ' + REFRESH_MS / 36e5 + ' h');
   if (stale) refreshAll();

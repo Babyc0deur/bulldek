@@ -27,7 +27,7 @@ for (const [nom, open, skip] of BACKENDS) {
 
   test(`${nom} : base vide au premier démarrage`, { skip }, () => {
     const dir = tmp(), s = open(dir), d = s.load();
-    assert.deepEqual(Object.keys(d.data).sort(), ['cot', 'daily', 'disagg', 'macro', 'tff', 'weekly']);
+    assert.deepEqual(Object.keys(d.data).sort(), ['cash', 'cot', 'daily', 'disagg', 'macro', 'tff', 'weekly']);
     assert.deepEqual(d.data.daily, {}); assert.deepEqual(d.meta, {});
     s.close(); fs.rmSync(dir, { recursive: true, force: true });
   });

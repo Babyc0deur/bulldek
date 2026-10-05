@@ -299,3 +299,11 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 /* Ratios intermarchés : trois indicateurs sur une ligne dans chaque carte, plus compacts. */
 .kpis.tri{grid-template-columns:repeat(3,1fr);gap:8px}.kpis.tri .kpi{padding:8px 6px}.kpis.tri .kpi span{font-size:.66rem}.kpis.tri .kpi b{font-size:1.1rem}
 .sd{font-size:.82em;white-space:nowrap}
+/* fiabilité des signaux */
+#rlSum tbody tr{cursor:pointer}#rlSum tr.rl-on th,#rlSum tr.rl-on td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+#rlSum td small,.rl-sig td small{color:var(--muted)}
+.rl-sig th[scope=row]{white-space:normal;min-width:180px}
+.rl-notes{margin:6px 0 0 18px;padding:0}.rl-notes li{margin:6px 0;line-height:1.5;color:var(--muted)}.rl-notes b{color:var(--text)}
+#rlRead p{margin:6px 0;line-height:1.5}
+.kpi .sig.sm{margin-top:6px}
+table.kd th[scope=row]{white-space:nowrap}table.kd td small{color:var(--muted)}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiabilité des signaux | BullDesk</title>
+<meta name="description" content="Ce qu'ont donné par le passé la confluence et chacun des signaux de BullDesk (COT, saisonnalité, Williams %R, open interest) : performance à 5, 10 et 20 séances, significativité et stabilité.">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/themes.css">
+<script src="/theme.js"></script>
+</head>
+<body data-page="reliability">
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top"><div class="wrap bar">
+  <a class="logo" href="/">BULL<b>DESK</b></a>
+  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/intermarket">Intermarket</a></li><li><a href="/strategie">Stratégie</a></li><li><a href="/fiabilite" class="cur-page">Fiabilité</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li></ul>
+</div></header>
+<main id="contenu">
+<div class="wrap pagehead">
+  <h1>Fiabilité des signaux</h1>
+  <p class="scr-sub">Ce qui a suivi, par le passé, chaque lecture du site : l'historique est rejoué semaine par semaine, avec uniquement les informations connues à chaque date.</p>
+</div>
+<div class="wrap">
+  <div id="app"><div id="msg">Calcul en cours…</div></div>
+  <div class="card doc-note">
+    <h2 class="sec">Méthode et limites</h2>
+    <ul class="rl-notes">
+      <li><b>Rejeu sans regarder le futur :</b> chaque vendredi soir (dernière séance de la semaine), les signaux sont recalculés avec ce qui était connu ce jour-là : seuls les rapports COT déjà publiés, la saisonnalité de la semaine qui commence d'après les années antérieures, le Williams %R, la tendance et l'open interest à cette date.</li>
+      <li><b>Ce qu'on mesure :</b> la variation du prix sur les 5, 10 ou 20 séances suivantes. Pour les indices, la série est ajustée des changements de contrat (sinon chaque échéance ajouterait un faux gain d'environ 0,5 à 1 %).</li>
+      <li><b>Écart :</b> performance moyenne quand le signal est haussier (+1) moins performance moyenne quand il est baissier (−1). Un écart positif veut dire que le signal a fonctionné dans le bon sens.</li>
+      <li><b>Verdict :</b> « Utile » si l'écart est statistiquement solide (t ≥ 2), « À contre-sens » s'il est solide mais inversé (t ≤ −2), « Non significatif » sinon, « Trop peu de cas » sous 15 semaines dans l'un des deux camps. Les mesures se chevauchent (un horizon de 20 séances couvre 4 semaines) : le calcul en tient compte en réduisant le nombre d'observations.</li>
+      <li><b>Stabilité :</b> l'écart est recalculé sur la première et la seconde moitié de l'historique. « Stable » si le signe est le même dans les deux : un signal qui ne marche que sur une moitié est suspect.</li>
+      <li><b>Limites :</b> ni frais ni glissement ; une seule règle par signal, pas d'optimisation ; un résultat passé ne garantit rien. Avec une vingtaine de signaux testés sur 37 marchés, quelques « Utile » apparaîtront par hasard : un verdict isolé compte moins qu'un résultat stable et répété sur plusieurs horizons.</li>
+    </ul>
+  </div>
+</div>
+</main>
+<footer class="f"><div class="wrap">
+  <nav class="fnav" aria-label="Informations"><a href="/a-propos">À propos et méthodologie</a></nav>
+  <p>Sources : Yahoo Finance (futures continus, indices au comptant pour l'ajustement), CFTC (rapports COT). Information éducative, pas un conseil en investissement.</p>
+</div></footer>
+<script src="/shared.js"></script>
+<script src="/reliabilityview.js"></script>
+</body>
+</html>

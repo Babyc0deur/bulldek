@@ -4,7 +4,7 @@ const CALC = require('../calc.js'), T = CALC.THRESHOLDS;
 
 test('valeurs de référence des seuils (toute modification doit être délibérée et se voir ici)', () => {
   assert.deepEqual(T, { cotBuy: 80, cotSell: 20, wrHigh: -20, wrLow: -80, wrPeriod: 14, seasonMinYears: 5, seasonHitRate: 0.6,
-    cotShortWeeks: 26, cotLongWeeks: 156, rollJump: 0.10, rollWindow: 15, oiFlatPct: 0.5, priceFlatPct: 0.5, confluenceStrong: 2 });
+    cotShortWeeks: 26, cotLongWeeks: 156, rollJump: 0.10, rollWindow: 15, oiFlatPct: 0.5, priceFlatPct: 0.5, confluenceStrong: 2, trendSma: 200 });
 });
 
 test('COT : les signaux basculent exactement aux seuils de la constante', () => {

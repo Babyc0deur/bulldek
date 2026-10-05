@@ -37,10 +37,10 @@
       const s = r.season;
       return `<tr data-href="/market/${r.slug}"><td class="nm"><a href="/market/${r.slug}">${r.name}</a>${r.fresh !== 'ok' ? ' <span class="warn-i" role="img" title="Données à vérifier pour ce marché (voir sa fiche)" aria-label="Données à vérifier">⚠</span>' : ''}<small>${r.group}</small></td>
         <td>${px(r.price)}</td><td class="${r.chgPct >= 0 ? 'pos' : 'neg'}">${(r.chgPct > 0 ? '+' : '') + r.chgPct.toFixed(2)} %${r.roll ? WARN : ''}</td>
-        <td>${cot(r.idx6)}</td>
+        <td title="${r.cotLabel || 'COT commerciaux (Legacy)'}">${cot(r.idx6)}</td>
         <td class="${s.avgPct == null ? '' : s.avgPct >= 0 ? 'pos' : 'neg'}">${s.avgPct == null ? '–' : (s.avgPct > 0 ? '+' : '') + s.avgPct.toFixed(2) + ' %'} <small>${s.up}/${s.n} hausse</small>${dayCell(r.seasonDay)}</td>
         <td class="${r.oi && r.oi.chgPct >= 0 ? 'pos' : 'neg'}">${r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' % ' + pill(r.oi.label, r.sig.oi > 0 ? 'buy' : r.sig.oi < 0 ? 'sell' : 'wait') : '–'}</td>
-        <td>${r.wr.toFixed(1)} ${r.roll ? pill('Non fiable', 'wait') + WARN : pill(z[0], z[1])}</td>
+        <td>${r.wr.toFixed(1)} ${r.roll ? pill('Non fiable', 'wait') + WARN : r.wrZone && !r.sig.wr ? `<span title="Contre la tendance : prix ${r.trend && r.trend.up ? 'au-dessus' : 'au-dessous'} de sa moyenne 200 séances, signal ignoré">${pill(z[0] + ' · contre-tendance', 'wait')}</span>` : pill(z[0], z[1])}${r.trend ? ` <small class="tr ${r.trend.up ? 'pos' : 'neg'}" title="Prix ${r.trend.up ? 'au-dessus' : 'au-dessous'} de sa moyenne 200 séances (${(r.trend.pct > 0 ? '+' : '') + r.trend.pct.toFixed(1)} %)">${r.trend.up ? '▲' : '▼'}</small>` : ''}</td>
         <td class="cf">${dot(r.sig.cot, 'COT')}${dot(r.sig.season, 'Saison')}${dot(r.sig.wr, 'Williams %R')}${dot(r.sig.oi, 'Open interest')} ${pill((r.score > 0 ? '+' : '') + r.score, cls)}</td></tr>`;
     }).join('');
     $('#tbl').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || '<tr><td colspan="8">Aucun marché ne correspond.</td></tr>'}</tbody>`;

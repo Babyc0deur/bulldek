@@ -89,12 +89,49 @@ function renderRatios(data, root, pick = {}) {
   paint();
 }
 
+// Volatilité des actions (vol.js → /api/volatility) : VIX, structure VIX / VIX 3 mois, volatilité réalisée du S&P 500, et lecture.
+function renderVol(data, root) {
+  const v = data && data.vol;
+  if (!v) { root.innerHTML = ''; return; }
+  const f = (x, d = 1) => (x == null ? '–' : x.toFixed(d).replace('.', ','));
+  const tone = k => (k === 'calm' || k === 'normal' ? 'buy' : k === 'tense' || k === 'flat' ? 'wait' : 'sell');
+  const day = new Date(v.date + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  root.innerHTML = `
+   <div class="sechead"><h2 class="sec">Volatilité des actions américaines</h2></div>
+   <div class="kpis">
+     <div class="kpi"><span>VIX (${day})</span><b>${f(v.vix)}</b><span class="sig sm ${tone(v.level.key)}">${v.level.label}</span></div>
+     <div class="kpi"><span>Rang sur 1 an</span><b>${v.rank == null ? '–' : v.rank + ' %'}</b></div>
+     <div class="kpi"><span>VIX / VIX 3 mois</span><b>${f(v.ratio, 2)}</b>${v.structure ? `<span class="sig sm ${tone(v.structure.key)}">structure ${v.structure.label}</span>` : ''}</div>
+     <div class="kpi"><span>Volatilité réalisée S&amp;P 500 (20 séances)</span><b>${v.rv20 == null ? '–' : f(v.rv20) + ' %'}</b></div>
+   </div>
+   <div class="card"><p>${v.reading}</p><p class="note">VIX : volatilité attendue à 1 mois sur le S&amp;P 500, déduite du prix des options (source FRED / Cboe). Repères : sous 15 calme, 15 à 20 normal, 20 à 30 tendu, au-delà de 30 stress. Une structure inversée (VIX au-dessus du VIX à 3 mois) accompagne en général les phases de stress.</p></div>`;
+}
+
+// Dates clés des 6 prochains mois (keydates.js → /api/keydates).
+function renderKeyDates(data, root) {
+  const list = (data && data.dates) || [];
+  if (!list.length) { root.innerHTML = ''; return; }
+  const cls = k => (k === 'fomc' ? 'sell' : k === 'cpi' || k === 'nfp' ? 'wait' : k === 'quad' || k === 'roll' ? 'buy' : '');
+  const fr = d => new Date(d + 'T00:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const until = d => new Date(d + 'T00:00:00Z').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  root.innerHTML = `
+   <div class="sechead"><h2 class="sec">Dates clés (6 mois)</h2></div>
+   <div class="card"><div class="tw"><table class="cmp kd"><thead><tr><th scope="col">Date</th><th scope="col">Événement</th><th scope="col">Détail</th></tr></thead><tbody>
+     ${list.map(d => `<tr class="kd-${d.kind}"><th scope="row">${fr(d.date)}</th><td>${cls(d.kind) ? `<span class="sig sm ${cls(d.kind)}">${d.label}</span>` : d.label}</td><td><small>${d.detail}</small></td></tr>`).join('')}
+   </tbody></table></div>
+   <p class="note">Sources : calendriers officiels de la Fed (FOMC, publié jusqu'en ${until(data.officialUntil.fomc)}) et du Bureau of Labor Statistics (CPI et emploi, publiés jusqu'en ${until(data.officialUntil.cpi)}) ; échéances et roll des futures sur indices calculés par règle (3e vendredi du mois, roll 8 jours avant). Les résultats d'entreprises ne sont pas inclus.</p></div>`;
+}
+
 async function bootIntermarket() {
   const root = document.querySelector('#app');
   const ratiosRoot = document.querySelector('#ratios');
   const ratiosReq = BD.json('/api/ratios').catch(() => null);                    // en parallèle ; son échec n'empêche pas la matrice
+  const volReq = BD.json('/api/volatility').catch(() => null), kdReq = BD.json('/api/keydates').catch(() => null);
   try { renderIntermarket(await BD.json('/api/intermarket'), root); }
   catch { root.innerHTML = '<div id="msg" class="err">Données indisponibles pour le moment. Réessayez dans une minute.</div>'; }
   if (ratiosRoot) { try { renderRatios(await ratiosReq, ratiosRoot); } catch { ratiosRoot.innerHTML = ''; } }
+  const volRoot = document.querySelector('#vol'), kdRoot = document.querySelector('#keydates');
+  if (volRoot) { try { renderVol(await volReq, volRoot); } catch { volRoot.innerHTML = ''; } }
+  if (kdRoot) { try { renderKeyDates(await kdReq, kdRoot); } catch { kdRoot.innerHTML = ''; } }
 }
 if (typeof document !== 'undefined' && document.body && document.body.dataset && document.body.dataset.page === 'intermarket') bootIntermarket();

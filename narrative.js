@@ -191,6 +191,21 @@ function ratioStory(market, inter, b) {
   if (flat.length) out.push(`Ratios stables sur 3 mois : ${flat.map(r => r.label).join(', ')}.`);
   return out.length ? out : null;
 }
+// Indices : volatilité (VIX, structure, volatilité réalisée) et dates clés des prochaines semaines (FOMC, CPI, emploi, roll et échéance des futures).
+// inter.vol = vol.js → volatility() ; inter.keyDates = keydates.js → keyDates().dates. null hors indices ou sans donnée.
+const KEY_KINDS = ['fomc', 'cpi', 'nfp', 'roll', 'quad'];
+function volStory(row, market, inter) {
+  if (!inter || !isIndex(row, market)) return null;
+  const out = [];
+  if (inter.vol && inter.vol.reading) out.push(inter.vol.reading);
+  const kd = (inter.keyDates || []).filter(d => KEY_KINDS.includes(d.kind)).slice(0, 6);
+  if (kd.length) {
+    out.push('Dates clés à venir : ' + kd.map(d => `${d.label} le ${frDate(d.date)}`).join(' ; ') + '.');
+    if (kd.some(d => d.kind === 'roll')) out.push('À la date de roll, le contrat de référence change : vérifiez l\'échéance sur laquelle portent vos ordres.');
+    if (kd.some(d => d.kind === 'fomc' || d.kind === 'cpi' || d.kind === 'nfp')) out.push('Autour de ces publications, la volatilité augmente souvent dans les minutes qui suivent : les stops proches peuvent être déclenchés par un simple aller-retour.');
+  }
+  return out.length ? out.join(' ') : null;
+}
 // Paragraphe distinct : régime et ratios (null hors indices ou sans donnée).
 function ratiosStory(row, market, inter, bias) {
   if (!inter || !isIndex(row, market)) return null;
@@ -261,7 +276,7 @@ function watch(row, bias) {
 }
 
 function narrative({ market, row, macro = {}, events = [], now, bias, win, session, daily, inter }) {
-  const m = macroStory(row, market, macro, bias), im = interStory(row, market, inter, bias), rr = ratiosStory(row, market, inter, bias);
+  const m = macroStory(row, market, macro, bias), im = interStory(row, market, inter, bias), rr = ratiosStory(row, market, inter, bias), vk = volStory(row, market, inter);
   return [
     { title: win && win.weekend ? 'Le point de clôture' : 'Le point du jour', text: situation(row, bias, win, session) },
     { title: 'Ce que disent les indicateurs entre eux', text: convergence(row) },
@@ -270,10 +285,11 @@ function narrative({ market, row, macro = {}, events = [], now, bias, win, sessi
     { title: 'Rendements, volatilité et corrélations', text: ratesStory(row, market, macro.yields, daily, bias) },
     ...(im ? [{ title: 'Intermarchés', text: im }] : []),
     ...(rr ? [{ title: 'Régime et ratios', text: rr }] : []),
+    ...(vk ? [{ title: 'Volatilité et dates clés', text: vk }] : []),
     ...(win && win.weekend ? [{ title: 'Les annonces de la semaine écoulée', text: recapStory(row, market, events, now, win) }] : []),
     { title: 'Les annonces à venir', text: agendaStory(row, market, events, now, win) },
     { title: 'Ce qui ferait changer la lecture', text: watch(row, bias) },
   ];
 }
 
-module.exports = { ratiosStory, interStory, surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };
+module.exports = { volStory, ratiosStory, interStory, surprise, ratesStory, ratesModel, narrative, kindOf, hawk, sensitivity, eventType, situation, convergence, priceFlow, macroStory, agendaStory, watch };

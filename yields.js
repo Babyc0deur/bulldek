@@ -2,10 +2,10 @@
 // (Réserve fédérale de Saint-Louis, CSV public sans clé). Ce module ne fait aucun appel réseau : adresse, analyse de la
 // réponse, variations et corrélations avec le prix d'un marché.
 const FRED = 'https://fred.stlouisfed.org/graph/fredgraph.csv';
-const SERIES = { DGS2: 'us2y', DGS5: 'us5y', DGS10: 'us10y', DGS30: 'us30y', T10Y2Y: 'curve', DFII10: 'real10y', T10YIE: 'breakeven', VIXCLS: 'vix',
+const SERIES = { DGS2: 'us2y', DGS5: 'us5y', DGS10: 'us10y', DGS30: 'us30y', T10Y2Y: 'curve', DFII10: 'real10y', T10YIE: 'breakeven', VIXCLS: 'vix', VXVCLS: 'vix3m',
   PCEPI: 'pceLevel', PCEPILFE: 'pceCoreLevel', DTWEXBGS: 'dxy' };                          // PCE et cœur PCE : indices, la variation sur un an est calculée ci-dessous ; FRED ne fournit pas directement le pourcentage via cette adresse
 const IDS = Object.keys(SERIES);
-// Plusieurs séries dans une même requête renvoient un fichier ZIP : une requête par série (11 au total, une fois toutes les 6 h).
+// Plusieurs séries dans une même requête renvoient un fichier ZIP : une requête par série (12 au total, une fois toutes les 6 h).
 const yieldsUrls = (now = Date.now(), years = 6) => IDS.map(id => [SERIES[id], `${FRED}?id=${id}&cosd=${new Date(now).getUTCFullYear() - years}-01-01`]);
 
 // CSV « observation_date,ID » ; valeurs manquantes notées « . » ou vides → [[« AAAA-MM-JJ », valeur], …]

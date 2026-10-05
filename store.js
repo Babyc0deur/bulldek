@@ -3,7 +3,7 @@
 // au lieu de réécrire les ~12 Mo du cache complet ; les écritures sont transactionnelles (WAL) donc sans fichier corrompu en cas d'arrêt brutal.
 const fs = require('fs'), path = require('path');
 
-const STORES = ['weekly', 'daily', 'cot', 'tff', 'disagg', 'macro'];
+const STORES = ['weekly', 'daily', 'cot', 'tff', 'disagg', 'macro', 'cash'];      // cash : indices au comptant (S&P 500, Nasdaq 100, Dow, Russell), pour ajuster les changements de contrat
 const blank = () => ({ data: Object.fromEntries(STORES.map(s => [s, {}])), ts: Object.fromEntries(STORES.map(s => [s, {}])), meta: {} });
 
 // Ancien format : un seul fichier cache.json { weekly:{code:…}, …, weeklyAt, dailyAt }. Sert à la migration et au mode JSON.

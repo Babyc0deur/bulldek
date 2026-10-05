@@ -6,9 +6,9 @@ const NOW = Date.parse('2026-09-28T08:00:00Z');
 const market = { slug: 'nasdaq-100', name: 'Nasdaq 100 E-Mini' };
 const day = i => new Date(Date.UTC(2026, 5, 1) + i * 864e5).toISOString().slice(0, 10);
 
-test('adresses : une requête par série (plusieurs séries = ZIP), 11 séries, fenêtre de 6 ans', () => {
+test('adresses : une requête par série (plusieurs séries = ZIP), 12 séries, fenêtre de 6 ans', () => {
   const u = Y.yieldsUrls(NOW);
-  assert.deepEqual(u.map(x => x[0]), ['us2y', 'us5y', 'us10y', 'us30y', 'curve', 'real10y', 'breakeven', 'vix', 'pceLevel', 'pceCoreLevel', 'dxy']);
+  assert.deepEqual(u.map(x => x[0]), ['us2y', 'us5y', 'us10y', 'us30y', 'curve', 'real10y', 'breakeven', 'vix', 'vix3m', 'pceLevel', 'pceCoreLevel', 'dxy']);
   for (const [, url] of u) { assert.match(url, /^https:\/\/fred\.stlouisfed\.org\/graph\/fredgraph\.csv\?id=[A-Z0-9]+&cosd=2020-01-01$/); assert.ok(!url.includes(',')); }
 });
 

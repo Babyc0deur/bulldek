@@ -68,10 +68,20 @@
     rollJump: 0.10, rollWindow: 15,                 // saut quotidien de plus de 10 % dans les 15 dernières séances : changement de contrat probable
     oiFlatPct: 0.5, priceFlatPct: 0.5,               // open interest / prix : variation hebdomadaire inférieure à 0,5 % = stable (pas de lecture)
     confluenceStrong: 2,                            // confluence (somme des 4 signaux, de −4 à +4) : ≥ +2 haussière, ≤ −2 baissière
+    trendSma: 200,                                  // filtre de tendance du Williams %R : moyenne mobile des clôtures sur 200 séances
   };
   // Signaux : +1 haussier, −1 baissier, 0 neutre.
   const cotSignal = idx => idx == null ? 0 : idx >= THRESHOLDS.cotBuy ? 1 : idx <= THRESHOLDS.cotSell ? -1 : 0;
   const wrSignal = v => v == null ? 0 : v < THRESHOLDS.wrLow ? 1 : v > THRESHOLDS.wrHigh ? -1 : 0;                 // survente = rebond, surachat = repli
+  // Williams %R filtré par la tendance : une survente n'est un signal d'achat qu'au-dessus de la moyenne 200 séances (repli dans une tendance haussière),
+  // un surachat n'est un signal de vente qu'en dessous (rebond dans une tendance baissière). Contre la tendance, le signal vaut 0. Sans moyenne : pas de filtre.
+  const wrTrendSignal = (v, close, ma) => { const s = wrSignal(v); return ma == null || close == null ? s : s > 0 && close < ma ? 0 : s < 0 && close > ma ? 0 : s; };
+  // Moyenne mobile simple des clôtures (colonne 1) sur n séances, alignée sur rows : null tant qu'il n'y a pas n séances.
+  function sma(rows, n = THRESHOLDS.trendSma) {
+    const out = new Array(rows.length).fill(null); let s = 0;
+    for (let i = 0; i < rows.length; i++) { s += rows[i][1]; if (i >= n) s -= rows[i - n][1]; if (i >= n - 1) out[i] = s / n; }
+    return out;
+  }
   const seasonSignal = s => {                                                            // moyenne et régularité de la semaine
     if (!s || s.n < THRESHOLDS.seasonMinYears || s.avgPct == null) return 0;
     if (s.avgPct > 0 && s.up / s.n >= THRESHOLDS.seasonHitRate) return 1;
@@ -297,6 +307,6 @@
     return { ...sum, priceChgPct, reading: oiReading(priceChgPct, sum.chgPct) };
   }
 
-  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, seasonSignal, cotLabel,
+  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, wrTrendSignal, sma, seasonSignal, cotLabel,
     usFederalHolidays, cotReleaseDate, etInstant, nextCotRelease, alignByDay, alignedReturns, correlation, rollingCorrelation, rebase, performance };
 });

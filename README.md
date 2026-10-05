@@ -40,6 +40,8 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `/market/<marché>` | Fiche : saisonnalité, Williams %R, COT (Legacy, TFF ou Disaggregated), confluence, fraîcheur |
 | `/screener` | Les 37 marchés : COT Index, Williams %R, saisonnalité, confluence |
 | `/compare?a=…&b=…` | Signaux, performance relative, corrélation, COT de deux marchés |
+| `/fiabilite` | Fiabilité des signaux : historique rejoué semaine par semaine, performance à 5, 10 et 20 séances selon la confluence et chaque signal, significativité, stabilité |
+| `/strategie` | Méthode de swing trading avec les outils du site |
 | `/intermarket` | Analyse intermarchés : matrice de corrélations (20 séances à tout l'historique) entre 12 marchés, relations classiques lues par rapport à la théorie, changements de régime |
 | `/inflation`, `/taux` | Inflation (CPI) et taux d'intérêt de 19 zones, comparés deux à deux (OCDE) |
 | `/a-propos` | Méthodologie (valeurs injectées depuis le code), limites connues et vie privée |
@@ -47,7 +49,9 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `/api/macro?kind=cpi|rates`, `/api/calendar`, `/api/debrief?slug=…` | Inflation et taux, annonces économiques, debrief du jour d'un marché |
 | `/api/ratios` | Six ratios intermarchés (actions/obligations, Nasdaq/S&P, Nasdaq/Dow, S&P/dollar, S&P/pétrole, cuivre/obligations) : série complète, variation, position sur 1 an, lecture |
 | `/api/intermarket` | Corrélations croisées calculées sur les séances quotidiennes en cache (mémorisées 5 min, aucun appel externe) |
-| `/api/yields` | Rendements, courbe, taux réel, VIX (FRED) |
+| `/api/yields` | Rendements, courbe, taux réel, VIX et VIX 3 mois (FRED) |
+| `/api/reliability` | Fiabilité des signaux pour les 37 marchés (calcul mémorisé tant que prix et COT ne changent pas) |
+| `/api/volatility`, `/api/keydates` | Volatilité des actions (VIX, structure, volatilité réalisée) ; dates clés des 6 prochains mois (FOMC, CPI, emploi, échéances et roll) |
 | `/api/screener`, `/api/status[?code=…]`, `/health` | Synthèse, fraîcheur, sonde de supervision |
 
 ## Architecture
@@ -57,6 +61,10 @@ server.js      HTTP, mise à jour automatique, API, protections (CSP, limite de 
 store.js       persistance : SQLite ligne par ligne, repli JSON, migration de l'ancien cache.json
 guard.js       limiteur de débit, adresse du client, regroupement des appels aux sources
 cftc.js        champs demandés à la CFTC et compaction des rapports
+adjust.js      ajustement des changements de contrat des indices (comparaison à l'indice au comptant)
+reliability.js rejeu historique des signaux et statistiques de fiabilité
+vol.js         volatilité (VIX, structure, volatilité réalisée) ; keydates.js : dates clés (FOMC, CPI, emploi, échéances)
+dailymerge.js  mise à jour incrémentale des prix quotidiens
 calc.js        TOUTES les formules et tous les seuils (THRESHOLDS) : COT Index, Williams %R,
                saisonnalité, signaux, calendrier de publication du COT, corrélation…
 freshness.js   règles « données à jour / à vérifier / indisponibles »
