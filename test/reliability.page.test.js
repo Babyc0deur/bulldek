@@ -86,9 +86,9 @@ test('page : aucune donnée → message clair', async () => {
   assert.match(root.innerHTML, /Historique insuffisant/);
 });
 
-test('menu : « Fiabilité » juste après « Stratégie » sur toutes les pages, y compris la fiche marché', () => {
-  for (const f of ['about.html', 'compare.html', 'screener.html', 'themes.html', 'inflation.html', 'rates.html', 'intermarket.html', 'strategy.html', 'reliability.html'])
-    assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /Stratégie<\/a><\/li><li><a href="\/fiabilite"[^>]*>Fiabilité<\/a><\/li>/, f);
-  assert.match(fs.readFileSync(path.join(ROOT, 'shared.js'), 'utf8'), /Stratégie<\/a><\/li><li><a href="\/fiabilite">\$\{ICON_COT\}Fiabilité/);
+test('menu : « Fiabilité » juste après « Intermarket » sur toutes les pages, y compris la fiche marché', () => {
+  for (const f of ['about.html', 'compare.html', 'screener.html', 'themes.html', 'inflation.html', 'rates.html', 'intermarket.html', 'reliability.html'])
+    assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /Intermarket<\/a><\/li><li><a href="\/fiabilite"[^>]*>Fiabilité<\/a><\/li>/, f);
+  assert.match(fs.readFileSync(path.join(ROOT, 'shared.js'), 'utf8'), /Intermarket<\/a><\/li><li><a href="\/fiabilite">\$\{ICON_COT\}Fiabilité/);
   assert.match(fs.readFileSync(path.join(ROOT, 'reliability.html'), 'utf8'), /<a href="\/fiabilite" class="cur-page">/);
 });

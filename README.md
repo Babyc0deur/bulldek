@@ -41,7 +41,6 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `/screener` | Les 37 marchés : COT Index, Williams %R, saisonnalité, confluence |
 | `/compare?a=…&b=…` | Signaux, performance relative, corrélation, COT de deux marchés |
 | `/fiabilite` | Fiabilité des signaux : historique rejoué semaine par semaine, performance à 5, 10 et 20 séances selon la confluence et chaque signal, significativité, stabilité |
-| `/strategie` | Méthode de swing trading avec les outils du site |
 | `/intermarket` | Analyse intermarchés : matrice de corrélations (20 séances à tout l'historique) entre 12 marchés, relations classiques lues par rapport à la théorie, changements de régime |
 | `/inflation`, `/taux` | Inflation (CPI) et taux d'intérêt de 19 zones, comparés deux à deux (OCDE) |
 | `/a-propos` | Méthodologie (valeurs injectées depuis le code), limites connues et vie privée |
