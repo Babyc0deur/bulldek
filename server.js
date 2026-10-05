@@ -529,6 +529,8 @@ process.on('unhandledRejection', e => log('rejet non géré :', e && e.message))
 // Rafraîchissement automatique : au démarrage si le cache est périmé, puis à intervalle régulier.
 const stale = MARKETS.some(m => Date.now() - (cache.ts.weekly[m.code] || 0) > REFRESH_MS || !cache.weekly[m.code] || !cache.cot[m.code] || !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || (m.disagg && !cache.disagg[m.code]) || (ADJ.CASH[m.slug] && !cache.cash[m.code]));
 if (!process.env.NO_REFRESH) {
+  // Le débrief a besoin du calendrier et des séries FRED : on les charge tout de suite, sans attendre la mise à jour des 37 marchés (environ 2 min).
+  for (const n of ['calendar', 'yields']) macroData(n).catch(() => {});
   logV(stale ? 'cache incomplet ou périmé : mise à jour au démarrage' : 'cache à jour : prochaine mise à jour dans ' + REFRESH_MS / 36e5 + ' h');
   if (stale) refreshAll();
   setInterval(refreshAll, REFRESH_MS);

@@ -39,7 +39,9 @@
 
   // Écran de chargement : affiché dès le premier rendu (classe « bd-loading » sur <html>, dessinée en CSS dans shared.css),
   // retiré quand la page a reçu ses données : après l'événement « load », dès qu'aucune requête n'est plus en cours depuis 150 ms.
-  // Les requêtes sont comptées en enveloppant fetch (ce script est le seul chargé dans <head>, donc avant ceux des pages). Au plus tard après 12 s.
+  // Les requêtes sont comptées en enveloppant fetch (ce script est le seul chargé dans <head>, donc avant ceux des pages).
+  // Au plus tard 2,5 s après « load » : une section lente (débrief, fiabilité) affiche alors son propre message de chargement au lieu de cacher toute la page.
+  // Filet de sécurité : 12 s si « load » n'arrive jamais.
   var root = document.documentElement, pending = 0, loaded = false, timer = null;
   if (!root.classList || typeof window === 'undefined') return;
   root.classList.add('bd-loading'); root.setAttribute('aria-busy', 'true');
@@ -54,6 +56,6 @@
       return p;
     };
   }
-  window.addEventListener('load', function () { loaded = true; check(); });
+  window.addEventListener('load', function () { loaded = true; check(); setTimeout(finish, 2500); });
   setTimeout(finish, 12000);
 })();

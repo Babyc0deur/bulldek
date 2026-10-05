@@ -1,0 +1,21 @@
+# Empêche le serveur Render (offre gratuite) de s'endormir : sans visite pendant 15 minutes, il s'arrête, et la visite suivante attend
+# son redémarrage (30 à 60 s) puis le retéléchargement des données (le disque gratuit est effacé à chaque arrêt).
+# Appel de /health toutes les 10 minutes. Gratuit pour un dépôt public ; consomme les 750 h mensuelles gratuites de Render
+# (un seul service allumé en permanence : environ 744 h). GitHub peut retarder une exécution planifiée de quelques minutes,
+# et suspend les tâches planifiées d'un dépôt public sans activité depuis 60 jours (un simple commit les relance).
+name: Réveil du serveur Render
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Appel de /health
+        run: curl -fsS --max-time 90 --retry 2 --retry-delay 10 https://bulldek.onrender.com/health

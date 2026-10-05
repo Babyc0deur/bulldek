@@ -34,8 +34,14 @@ test('reste affiché tant qu\'une requête est en cours, y compris entre deux re
   assert.equal(e.loading(), false);
 });
 
-test('filet de sécurité : retiré au bout de 12 s si une requête ne répond jamais', async () => {
+test('filet de sécurité : retiré au bout de 12 s si « load » n\'arrive jamais', async () => {
   const e = env();
-  e.window.fetch('/api/x'); e.listeners.load(); await e.tick(11000);
+  e.window.fetch('/api/x'); await e.tick(11000);
   assert.equal(e.loading(), true); await e.tick(1100); assert.equal(e.loading(), false, 'retiré au bout de 12 s');
+});
+
+test('section lente : retiré au plus tard 2,5 s après « load », même si une requête est encore en cours', async () => {
+  const e = env();
+  e.window.fetch('/api/debrief?slug=sp500'); e.listeners.load(); await e.tick(2400);
+  assert.equal(e.loading(), true); await e.tick(150); assert.equal(e.loading(), false, 'la fiche s\'affiche ; le débrief garde son propre message');
 });

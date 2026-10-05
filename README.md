@@ -103,6 +103,7 @@ CI : `.github/workflows/ci.yml` lance les tests sur Node 22 et 24 ; le lundi, il
 1. Mettre le dossier dans un dépôt Git, puis **New → Blueprint** sur Render : `render.yaml` fait le reste (Node 22, `TRUST_PROXY=1`, limites).
 2. Lancer `npm run check:release` : il vérifie `render.yaml` (`TRUST_PROXY`, `NODE_VERSION`).
 3. Sur l'offre gratuite, le disque est éphémère : le cache est reconstitué à chaque redémarrage (1 à 2 minutes). Un disque persistant (variable `DATA_DIR`) l'évite.
+4. L'offre gratuite endort le serveur après 15 minutes sans visite. La tâche GitHub Actions `.github/workflows/keepalive.yml` appelle `/health` toutes les 10 minutes pour l'en empêcher (gratuit pour un dépôt public ; consomme les 750 h mensuelles gratuites de Render, suffisantes pour un seul service).
 
 ## Limites connues et points ouverts
 
