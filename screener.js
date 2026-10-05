@@ -10,7 +10,7 @@
   $('#upd').textContent = `Saison : ${data.week}` + (data.updated ? ` · prix mis à jour le ${new Date(data.updated).toLocaleString('fr-FR')}` : '');
 
   const COLS = [
-    ['name', 'Actif'], ['price', 'Prix'], ['chgPct', 'Jour'], ['idx6', 'COT 6 mois'],
+    ['name', 'Actif'], ['idx6', 'COT 6 mois'],
     ['season', `Saison ${data.week} (max) · (${data.day ? data.day.label : 'jour'})`], ['oi', 'Open interest'], ['wr', 'Williams %R (14)'], ['score', 'Confluence'],
   ];
   const dayCell = sd => !sd || sd.avgPct == null ? ' <span class="sd" title="Saisonnalité du jour : aucune donnée">(–)</span>' : ` <span class="sd ${sd.avgPct >= 0 ? 'pos' : 'neg'}" title="Saisonnalité du jour (${data.day ? data.day.label : ''}) : ${sd.up}/${sd.n} années en hausse">(${(sd.avgPct > 0 ? '+' : '') + sd.avgPct.toFixed(2)} %)</span>`;
@@ -19,7 +19,6 @@
   const WARN = ' <span title="Saut probable dû au changement de contrat (future continu non ajusté) : Williams %R non fiable pendant 14 séances" class="warn-i">⚠</span>';
   const pill = (t, c) => `<span class="sig sm ${c}">${t}</span>`;
   const cot = i => { const s = CALC.cotSignal(i); return `${i.toFixed(0)} % ${pill(CALC.cotLabel(i), s > 0 ? 'buy' : s < 0 ? 'sell' : 'wait')}`; };
-  const px = v => v.toLocaleString('en-US', { maximumFractionDigits: v < 10 ? 4 : v < 1000 ? 2 : 1 });
   const dot = BD.sigDot;                                                                       // point de signal accessible (role img + aria-label), commun avec la fiche et la comparaison
 
   function paint() {
@@ -36,7 +35,6 @@
       const cls = CALC.confluenceClass(r.score);
       const s = r.season;
       return `<tr data-href="/market/${r.slug}"><td class="nm"><a href="/market/${r.slug}">${r.name}</a>${r.fresh !== 'ok' ? ' <span class="warn-i" role="img" title="Données à vérifier pour ce marché (voir sa fiche)" aria-label="Données à vérifier">⚠</span>' : ''}<small>${r.group}</small></td>
-        <td>${px(r.price)}</td><td class="${r.chgPct >= 0 ? 'pos' : 'neg'}">${(r.chgPct > 0 ? '+' : '') + r.chgPct.toFixed(2)} %${r.roll ? WARN : ''}</td>
         <td title="${r.cotLabel || 'COT commerciaux (Legacy)'}">${cot(r.idx6)}</td>
         <td class="${s.avgPct == null ? '' : s.avgPct >= 0 ? 'pos' : 'neg'}">${s.avgPct == null ? '–' : (s.avgPct > 0 ? '+' : '') + s.avgPct.toFixed(2) + ' %'} <small>${s.up}/${s.n} hausse</small>${dayCell(r.seasonDay)}</td>
         <td class="${r.oi && r.oi.chgPct >= 0 ? 'pos' : 'neg'}">${r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' % ' + pill(r.oi.label, r.sig.oi > 0 ? 'buy' : r.sig.oi < 0 ? 'sell' : 'wait') : '–'}</td>

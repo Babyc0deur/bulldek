@@ -105,7 +105,8 @@ test('CSS : la grille de confluence passe à 4 colonnes, 2 sur tablette, 1 sur m
 test('screener : chaque ligne a exactement autant de cellules que d\'en-têtes (pas de décalage de colonnes)', async () => {
   const s = runScreener(ROWS); await wait();
   const html = s.el('#tbl').innerHTML, entetes = (html.match(/<thead>[\s\S]*?<\/thead>/)[0].match(/<th /g) || []).length;
-  assert.equal(entetes, 8);
+  assert.equal(entetes, 6, 'Actif, COT, Saison, Open interest, Williams %R, Confluence (ni prix ni variation du jour)');
+  assert.doesNotMatch(html.match(/<thead>[\s\S]*?<\/thead>/)[0], />Prix<|>Jour</);
   for (const r of rowsHtml(html)) assert.equal((r.html.match(/<td[ >]/g) || []).length, entetes, `ligne ${r.slug} : cellules ≠ en-têtes`);
   assert.doesNotMatch(html, /<!--/, 'aucun commentaire HTML résiduel');
 });

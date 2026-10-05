@@ -36,4 +36,24 @@
     obs.observe(document.documentElement, { childList: true, subtree: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+
+  // Écran de chargement : affiché dès le premier rendu (classe « bd-loading » sur <html>, dessinée en CSS dans shared.css),
+  // retiré quand la page a reçu ses données : après l'événement « load », dès qu'aucune requête n'est plus en cours depuis 150 ms.
+  // Les requêtes sont comptées en enveloppant fetch (ce script est le seul chargé dans <head>, donc avant ceux des pages). Au plus tard après 12 s.
+  var root = document.documentElement, pending = 0, loaded = false, timer = null;
+  if (!root.classList || typeof window === 'undefined') return;
+  root.classList.add('bd-loading'); root.setAttribute('aria-busy', 'true');
+  function finish() { clearTimeout(timer); root.classList.remove('bd-loading'); root.removeAttribute('aria-busy'); }
+  function check() { clearTimeout(timer); if (loaded && pending === 0) timer = setTimeout(function () { if (pending === 0) finish(); }, 150); }
+  if (window.fetch) {
+    var fetch0 = window.fetch;
+    window.fetch = function () {
+      pending++;
+      var p = fetch0.apply(window, arguments), done = function () { pending = Math.max(0, pending - 1); check(); };
+      p.then(done, done);
+      return p;
+    };
+  }
+  window.addEventListener('load', function () { loaded = true; check(); });
+  setTimeout(finish, 12000);
 })();

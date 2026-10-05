@@ -73,9 +73,18 @@ function renderReliability(data, root, pick = {}) {
   paint();
 }
 
-async function bootReliability() {
-  const root = document.querySelector('#app');
-  try { renderReliability(await BD.json('/api/reliability'), root); }
-  catch { root.innerHTML = '<div id="msg" class="err">Données indisponibles pour le moment. Réessayez dans une minute.</div>'; }
+// Le serveur calcule la fiabilité en arrière-plan : tant que le premier calcul n'est pas fini, il répond { loading, progress }.
+// La page affiche alors l'avancement et redemande toutes les 2 secondes (au plus 5 minutes).
+async function bootReliability(root = document.querySelector('#app'), wait = ms => new Promise(r => setTimeout(r, ms))) {
+  try {
+    for (let i = 0; i < 150; i++) {
+      const data = await BD.json('/api/reliability');
+      if (!data.loading) return renderReliability(data, root);
+      const p = data.progress || {};
+      root.innerHTML = `<div id="msg" class="rl-wait" role="status"><span class="bd-spin" aria-hidden="true"></span> Calcul de la fiabilité des signaux sur tout l'historique${p.total ? ` : ${p.done} / ${p.total} marchés` : ''}… La page s'affichera d'elle-même.</div>`;
+      await wait(2000);
+    }
+    throw new Error('délai dépassé');
+  } catch { root.innerHTML = '<div id="msg" class="err">Données indisponibles pour le moment. Réessayez dans une minute.</div>'; }
 }
 if (typeof document !== 'undefined' && document.body && document.body.dataset && document.body.dataset.page === 'reliability') bootReliability();

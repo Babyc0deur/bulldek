@@ -24,9 +24,15 @@ test.before(async () => {
 });
 test.after(async () => { await new Promise(done => { if (!proc || proc.exitCode !== null) return done(); proc.once('exit', done); proc.kill(); }); if (tmp) fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); });
 
-test('/api/reliability : marchés rejoués, trois horizons, signaux et libellés ; /fiabilite servie avec son script', async () => {
-  const r = await get('/api/reliability'), d = JSON.parse(r.body);
-  assert.equal(r.status, 200); assert.deepEqual(d.horizons, [5, 10, 20]); assert.equal(d.markets.length, 1);
+test('/api/reliability : calcul en arrière-plan (« en cours » avec avancement, puis résultat) ; trois horizons, signaux et libellés ; /fiabilite servie', async () => {
+  let r, d;
+  for (let i = 0; i < 100; i++) {                                                       // le serveur lance le calcul 2 s après son démarrage
+    r = await get('/api/reliability'); d = JSON.parse(r.body);
+    if (!d.loading) break;
+    assert.ok(d.progress && typeof d.progress.done === 'number', 'avancement fourni pendant le calcul');
+    await new Promise(res => setTimeout(res, 200));
+  }
+  assert.equal(r.status, 200); assert.ok(!d.loading, 'calcul terminé'); assert.deepEqual(d.horizons, [5, 10, 20]); assert.equal(d.markets.length, 1);
   const m = d.markets[0];
   assert.equal(m.slug, 'gold'); assert.equal(m.cotSource, 'legacy'); assert.equal(m.adjusted, false, 'pas de comptant pour l\'or : série brute');
   assert.ok(m.weeks > 100); assert.ok(m.horizons[5].signals.season && m.horizons[20].scores.length === 9);
@@ -91,4 +97,12 @@ test('menu : « Fiabilité » juste après « Intermarket » sur toutes les page
     assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /Intermarket<\/a><\/li><li><a href="\/fiabilite"[^>]*>Fiabilité<\/a><\/li>/, f);
   assert.match(fs.readFileSync(path.join(ROOT, 'shared.js'), 'utf8'), /Intermarket<\/a><\/li><li><a href="\/fiabilite">\$\{ICON_COT\}Fiabilité/);
   assert.match(fs.readFileSync(path.join(ROOT, 'reliability.html'), 'utf8'), /<a href="\/fiabilite" class="cur-page">/);
+});
+
+test('page : pendant le calcul côté serveur, avancement affiché puis page rendue dès que le résultat arrive', async () => {
+  const replies = [{ loading: true, progress: { done: 3, total: 37 } }, { loading: true, progress: { done: 30, total: 37 } }, DATA], seen = [];
+  const { root } = await render({ src: path.join(ROOT, 'reliabilityview.js'), fnName: '((a, root) => bootReliability(root, async () => { a.push(root.innerHTML); }))', args: seen,
+    now: Date.parse('2026-10-05T10:00:00Z'), calc: {}, overrides: { json: async () => replies.shift() } });
+  assert.equal(seen.length, 2); assert.match(seen[0], /3 \/ 37 marchés/); assert.match(seen[1], /30 \/ 37 marchés/); assert.match(seen[0], /role="status"/);
+  assert.match(root.innerHTML, /Résumé par marché/);
 });
