@@ -177,7 +177,6 @@ async function refreshAll() {
   for (const name of Object.keys(MACRO_TTL)) macroData(name).catch(() => {});                 // en arrière-plan : l'OCDE peut prendre quelques minutes
   cache.lastRefresh = Date.now(); store.putMeta('lastRefresh', cache.lastRefresh);
   cacheSummary();
-  reliabilityRefresh();                                                        // en arrière-plan : la page Fiabilité est prête avant la première visite
   log('données rafraîchies en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s (' + fails + ' échec' + (fails > 1 ? 's' : '') + ')');
 }
 
@@ -372,9 +371,9 @@ function volData() {
 }
 
 // ---- Fiabilité des signaux (reliability.js) : historique rejoué semaine par semaine pour chaque marché ----
-// Le calcul complet prend environ 1,5 s en local mais jusqu'à 25 s sur un petit serveur (Render) : il n'est jamais fait pendant une requête.
-// Il tourne en arrière-plan au démarrage et après chaque mise à jour des données, un marché à la fois en rendant la main entre deux
-// marchés (les autres requêtes ne sont pas bloquées). Pendant le calcul, l'API sert le résultat précédent s'il existe, sinon un état « en cours ».
+// Le calcul complet prend environ 1,5 s en local mais jusqu'à 25 s sur un petit serveur (Render) : la requête n'attend pas la fin du calcul.
+// Il n'est lancé qu'à la demande (visite de la page Fiabilité), un marché à la fois en rendant la main entre deux marchés : les autres requêtes
+// ne sont pas bloquées. Pendant le calcul, l'API sert le résultat précédent s'il existe, sinon un état « en cours » avec l'avancement.
 let relMemo = { at: 0, stamp: '', val: null }, relJob = null, relProgress = { done: 0, total: 0 };
 const relStamp = () => MARKETS.map(m => (cache.ts.daily[m.code] || 0) + ':' + (cache.ts.cot[m.code] || 0) + ':' + (cache.ts.cash[m.code] || 0)).join(',');
 const relFresh = () => relMemo.val && relMemo.stamp === relStamp() && Date.now() - relMemo.at < 12 * 3600e3;
@@ -396,7 +395,7 @@ function reliabilityRefresh() {
       relProgress.done++;
     }
     relMemo = { at: Date.now(), stamp, val: { updated: Date.now(), horizons: REL.HORIZONS, labels: REL.LABELS, minCases: 15, markets } };
-    logV('fiabilité des signaux : ' + markets.length + ' marchés rejoués en arrière-plan en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
+    logV('fiabilité des signaux : ' + markets.length + ' marchés rejoués (à la demande) en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
   })().catch(e => log('fiabilité des signaux : échec du calcul :', e.message)).finally(() => { relJob = null; });
   return relJob;
 }
@@ -523,7 +522,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
 // Délais : évite les connexions lentes qui occupent le serveur (slowloris) et les requêtes qui traînent.
 server.headersTimeout = 10000; server.requestTimeout = 15000; server.keepAliveTimeout = 5000; server.maxRequestsPerSocket = 1000;
 server.on('error', e => { if (e.code === 'EADDRINUSE') { log('ERREUR : le port ' + PORT + ' est déjà utilisé (une autre instance tourne ?). Arrêtez-la ou lancez avec un autre port : PORT=8124 npm start'); process.exit(1); } throw e; });
-server.listen(PORT, () => { log('BullDesk sur le port', PORT); cacheSummary(); setTimeout(reliabilityRefresh, 2000).unref(); logV('config : données dans ' + DATA_DIR + ', mise à jour toutes les ' + REFRESH_MS / 36e5 + ' h' + (process.env.NO_REFRESH ? ' (désactivée)' : '') + ', TRUST_PROXY=' + TRUST_PROXY); });
+server.listen(PORT, () => { log('BullDesk sur le port', PORT); cacheSummary(); logV('config : données dans ' + DATA_DIR + ', mise à jour toutes les ' + REFRESH_MS / 36e5 + ' h' + (process.env.NO_REFRESH ? ' (désactivée)' : '') + ', TRUST_PROXY=' + TRUST_PROXY); });
 process.on('unhandledRejection', e => log('rejet non géré :', e && e.message));
 
 // Rafraîchissement automatique : au démarrage si le cache est périmé, puis à intervalle régulier.
