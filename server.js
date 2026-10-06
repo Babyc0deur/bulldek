@@ -17,10 +17,10 @@ const STATIC = {
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
   '/favicon.svg': ['assets/logo-icon.svg', 'image/svg+xml'], '/logo.svg': ['assets/logo.svg', 'image/svg+xml'], '/loader.svg': ['assets/loader.svg', 'image/svg+xml'], '/logo-anim.svg': ['assets/logo-anim.svg', 'image/svg+xml'],
 };
-const SCRIPTS = new Set(['calendarview.js', 'reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
+const SCRIPTS = new Set(['calendarview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./cotsource.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -331,8 +331,8 @@ function weekLabel(now) {
   return monday.getUTCMonth() === sunday.getUTCMonth() ? `${monday.getUTCDate()}–${sunday.getUTCDate()} ${mon(sunday)}` : `${monday.getUTCDate()} ${mon(monday)}–${sunday.getUTCDate()} ${mon(sunday)}`;
 }
 
-// Source du signal COT de la confluence, par marché (reliability.js → COT_SOURCES). Par défaut : commerciaux du rapport Legacy.
-// Le rapport TFF (asset managers, fonds à levier) a été testé sur les indices (page Fiabilité) : il n'a pas fait mieux que le Legacy, il reste donc affiché
+// Source du signal COT de la confluence, par marché (cotsource.js → COT_SOURCES). Par défaut : commerciaux du rapport Legacy.
+// Le rapport TFF (asset managers, fonds à levier) a été testé sur les indices : il n'a pas fait mieux que le Legacy, il reste donc affiché
 // à titre d'information. Pour basculer un marché : { 'sp500': 'tff-am' }.
 const COT_SOURCE = {};
 const SEASON_YEARS = 60, SEASON_CAPS = { 'dow-jones': 20 };               // plafond d'années par marché : le Dow est volontairement limité à 20 ans ; le Russell 2000 garde tout ce qui existe (8 ans)
@@ -417,41 +417,6 @@ function calendarData(key, now = Date.now(), week = null) {
   return val;
 }
 
-// ---- Fiabilité des signaux (reliability.js) : historique rejoué semaine par semaine pour chaque marché ----
-// Le calcul complet prend environ 1,5 s en local mais jusqu'à 25 s sur un petit serveur (Render) : la requête n'attend pas la fin du calcul.
-// Il n'est lancé qu'à la demande (visite de la page Fiabilité), un marché à la fois en rendant la main entre deux marchés : les autres requêtes
-// ne sont pas bloquées. Pendant le calcul, l'API sert le résultat précédent s'il existe, sinon un état « en cours » avec l'avancement.
-let relMemo = { at: 0, stamp: '', val: null }, relJob = null, relProgress = { done: 0, total: 0 };
-const relStamp = () => MARKETS.map(m => (cache.ts.daily[m.code] || 0) + ':' + (cache.ts.cot[m.code] || 0) + ':' + (cache.ts.cash[m.code] || 0)).join(',');
-const relFresh = () => relMemo.val && relMemo.stamp === relStamp() && Date.now() - relMemo.at < 12 * 3600e3;
-function reliabilityRefresh() {
-  if (relJob) return relJob;
-  if (relFresh()) return Promise.resolve();                                  // données inchangées depuis le dernier calcul : rien à refaire
-  relJob = (async () => {
-    const stamp = relStamp(), t0 = Date.now(), markets = [];
-    relProgress = { done: 0, total: MARKETS.length };
-    for (const m of MARKETS) {
-      await new Promise(r => setImmediate(r));                                // rend la main : les requêtes en attente passent entre deux marchés
-      const raw = cache.daily[m.code], cot = cache.cot[m.code];
-      if (raw && cot) {
-        const src = COT_SOURCE[m.slug] && cache.tff[m.code] ? COT_SOURCE[m.slug] : 'legacy';
-        const res = REL.summarize(REL.samples({ rows: adjusted(m).rows, raw, legacyHist: cot.hist, tffHist: cache.tff[m.code] && cache.tff[m.code].hist, cotSource: src,
-          seasonCap: SEASON_CAPS[m.slug] || SEASON_YEARS, crypto: m.group === 'Crypto' }), src);
-        if (res) markets.push({ slug: m.slug, name: m.name, group: m.group, adjusted: !!(ADJ.CASH[m.slug] && cache.cash[m.code]), ...res });
-      }
-      relProgress.done++;
-    }
-    relMemo = { at: Date.now(), stamp, val: { updated: Date.now(), horizons: REL.HORIZONS, labels: REL.LABELS, minCases: 15, markets } };
-    logV('fiabilité des signaux : ' + markets.length + ' marchés rejoués (à la demande) en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
-  })().catch(e => log('fiabilité des signaux : échec du calcul :', e.message)).finally(() => { relJob = null; });
-  return relJob;
-}
-function reliabilityData() {
-  if (relFresh()) return relMemo.val;
-  reliabilityRefresh();
-  return relMemo.val ? { ...relMemo.val, refreshing: true } : { loading: true, progress: relProgress };
-}
-
 // ---- Protections : en-têtes de sécurité, limite de débit, validation des requêtes ----
 // CSP stricte : ni script ni style en ligne, aucune ressource tierce.
 const SECURITY_HEADERS = {
@@ -501,7 +466,6 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/api/screener') return send(res, 200, JSON.stringify(screener()));
     if (u.pathname === '/api/intermarket') return send(res, 200, JSON.stringify(intermarket()));
     if (u.pathname === '/api/ratios') return send(res, 200, JSON.stringify(ratiosData()));
-    if (u.pathname === '/api/reliability') return send(res, 200, JSON.stringify(reliabilityData()));
     if (u.pathname === '/api/volatility') { await macroData('yields').catch(() => {}); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.yields || 0, vol: volData() })); }
     if (u.pathname === '/api/calendrier') {                                    // ?m=AAAA-MM (mois, mois en cours par défaut) ou ?w=AAAA-MM-JJ (semaine commençant ce lundi)
       const months = calendarMonths(), cur = MONTHCAL.nyDate(Date.now()).slice(0, 7), w = u.searchParams.get('w');
@@ -569,7 +533,6 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/themes') return send(res, 200, fs.readFileSync(path.join(__dirname, 'themes.html')), 'text/html');
     if (u.pathname === '/inflation' || u.pathname === '/taux') return send(res, 200, fs.readFileSync(path.join(__dirname, u.pathname === '/inflation' ? 'inflation.html' : 'rates.html')), 'text/html');
     if (u.pathname === '/calendrier') return send(res, 200, fs.readFileSync(path.join(__dirname, 'calendar.html')), 'text/html');
-    if (u.pathname === '/fiabilite') return send(res, 200, fs.readFileSync(path.join(__dirname, 'reliability.html')), 'text/html');
     if (u.pathname === '/intermarket') return send(res, 200, fs.readFileSync(path.join(__dirname, 'intermarket.html')), 'text/html');
     if (u.pathname === '/compare') return send(res, 200, fs.readFileSync(path.join(__dirname, 'compare.html')), 'text/html');
     if (SCRIPTS.has(section) && !slug) return send(res, 200, fs.readFileSync(path.join(__dirname, section)), 'text/javascript');
