@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="terminal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#0a0a08">
+<title>Calendrier des indices | BullDesk</title>
+<meta name="description" content="Jour par jour : saisonnalité commune du S&amp;P 500, du Nasdaq 100 et du Dow (15, 20 et 25 ans) et annonces économiques américaines à l'heure de New York.">
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="/themes.css">
+<script src="/theme.js"></script>
+</head>
+<body data-page="calendar">
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top"><div class="wrap bar">
+  <a class="logo" href="/"><img class="logo-mark" src="/logo-anim.svg" alt="" width="30" height="30"><span>BULL<b>DESK</b></span></a>
+  <ul class="jump"><li><a href="/screener">Screener</a></li><li><a href="/compare">Comparer</a></li><li><a href="/inflation">Inflation</a></li><li><a href="/taux">Taux</a></li><li><a href="/intermarket">Intermarket</a></li><li><a href="/fiabilite">Fiabilité</a></li><li><a href="/calendrier" class="cur-page">Calendrier</a></li><li><a href="/market/nasdaq-100">Fiche marché</a></li></ul>
+</div></header>
+<main id="contenu">
+<div class="wrap pagehead">
+  <h1>Calendrier des indices</h1>
+  <p class="scr-sub">Jour par jour : les jours où le S&amp;P 500, le Nasdaq 100 et le Dow ont historiquement monté ou baissé ensemble, et les annonces américaines du jour, à l'heure de New York.</p>
+</div>
+<div class="wrap">
+  <div id="app"><div id="msg">Chargement…</div></div>
+  <div class="card">
+    <h2 class="sec">Lecture</h2>
+    <ul class="rl-notes">
+      <li><b>Saisonnalité :</b> pour chaque jour du mois, variation moyenne de la séance (clôture du jour contre clôture de la séance précédente) sur les 15, 20 et 25 dernières années complètes où le marché a coté ce jour-là, sur les futures ajustés des changements de contrat. Le Dow est limité à 20 ans.</li>
+      <li><b>Sens commun :</b> une période est haussière quand les trois indices ont une moyenne positive, baissière quand les trois sont négatives. « Haussier » ou « Baissier » : les trois périodes concordent ; « fort » : en plus, chaque indice a suivi ce sens au moins 60 % des années sur au moins deux périodes ; « Plutôt » : deux périodes sur trois ; « Mixte » : les périodes se contredisent ; « irrégulier » : moyenne tirée par quelques années, la moitié des années ou plus allant dans l'autre sens.</li>
+      <li><b>Annonces :</b> heure de New York. « officiel » : calendriers publiés de la Fed, du BLS, du BEA et du Census ; « habituel » : rendez-vous réguliers (inscriptions au chômage le jeudi, ISM, Michigan) dont la date exacte n'est pas publiée longtemps à l'avance ; « Forex Factory » : semaine en cours ; « règle » : échéances calculées (3e vendredi du mois, roll 8 jours avant l'échéance trimestrielle). Les résultats d'entreprises ne sont pas inclus.</li>
+      <li><b>Limites :</b> chaque jour repose sur 10 à 19 années seulement ; une annonce peut effacer une tendance saisonnière en quelques minutes. Information éducative, pas un conseil en investissement.</li>
+    </ul>
+  </div>
+</div>
+</main>
+<footer class="f"><div class="wrap">
+  <nav class="fnav" aria-label="Informations"><a href="/a-propos">À propos et méthodologie</a></nav>
+  <p>Sources : Yahoo Finance (futures continus, indices au comptant pour l'ajustement), Fed, BLS, BEA, Census, Forex Factory. Information éducative, pas un conseil en investissement.</p>
+</div></footer>
+<script src="/shared.js"></script>
+<script src="/calendarview.js"></script>
+</body>
+</html>

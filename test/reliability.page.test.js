@@ -106,3 +106,14 @@ test('page : pendant le calcul côté serveur, avancement affiché puis page ren
   assert.equal(seen.length, 2); assert.match(seen[0], /3 \/ 37 marchés/); assert.match(seen[1], /30 \/ 37 marchés/); assert.match(seen[0], /role="status"/);
   assert.match(root.innerHTML, /Résumé par marché/);
 });
+
+test('/calendrier et /api/calendrier : page servie, mois en cours par défaut, mois hors période refusé ; menu « Calendrier » après « Fiabilité »', async () => {
+  const p = await get('/calendrier'); assert.equal(p.status, 200); assert.match(p.body, /data-page="calendar"/); assert.match(p.body, /<script src="\/calendarview\.js">/);
+  assert.equal((await get('/calendarview.js')).status, 200); assert.equal((await get('/monthcal.js')).status, 404, 'module de calcul côté serveur');
+  const c = JSON.parse((await get('/api/calendrier')).body);
+  assert.ok(c.months.length >= 2); assert.equal(`${c.year}-${String(c.month + 1).padStart(2, '0')}`, c.months[0]); assert.ok(c.days.length >= 28 && c.days.some(d => d.today));
+  const bad = await get('/api/calendrier?m=1999-01'); assert.equal(bad.status, 400); assert.ok(JSON.parse(bad.body).months);
+  for (const f of ['about.html', 'compare.html', 'screener.html', 'themes.html', 'inflation.html', 'rates.html', 'intermarket.html', 'reliability.html', 'calendar.html'])
+    assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /Fiabilité<\/a><\/li><li><a href="\/calendrier"[^>]*>Calendrier<\/a><\/li>/, f);
+  assert.match(fs.readFileSync(path.join(ROOT, 'shared.js'), 'utf8'), /Fiabilité<\/a><\/li><li><a href="\/calendrier">\$\{ICON_COT\}Calendrier/);
+});

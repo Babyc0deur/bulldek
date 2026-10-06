@@ -17,10 +17,10 @@ const STATIC = {
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
   '/favicon.svg': ['assets/logo-icon.svg', 'image/svg+xml'], '/logo.svg': ['assets/logo.svg', 'image/svg+xml'], '/loader.svg': ['assets/loader.svg', 'image/svg+xml'], '/logo-anim.svg': ['assets/logo-anim.svg', 'image/svg+xml'],
 };
-const SCRIPTS = new Set(['reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
+const SCRIPTS = new Set(['calendarview.js', 'reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -371,6 +371,24 @@ function volData() {
   return VOL.volatility({ vix: y.vix, vix3m: y.vix3m, spx: sp && adjusted(sp).rows });
 }
 
+// ---- Calendrier du mois (monthcal.js) : saisonnalité commune ES / NQ / YM et annonces, heure de New York ----
+// Mois proposés : du mois en cours (à New York) jusqu'au dernier mois couvert par les calendriers officiels, et au moins le mois suivant.
+function calendarMonths(now = Date.now()) {
+  const [y, m] = MONTHCAL.nyDate(now).split('-').map(Number), end = MONTHCAL.OFFICIAL.at(-1)[0].slice(0, 7), out = [];
+  for (let k = 0; k < 24; k++) { const yy = y + Math.floor((m - 1 + k) / 12), mm = (m - 1 + k) % 12, key = yy + '-' + String(mm + 1).padStart(2, '0'); if (k > 1 && key > end) break; out.push(key); }
+  return out;
+}
+const calMemo = new Map();
+function calendarData(key, now = Date.now()) {
+  const [y, m] = key.split('-').map(Number), today = MONTHCAL.nyDate(now);
+  const series = {}; for (const [tag, slug] of [['ES', 'sp500'], ['NQ', 'nasdaq-100'], ['YM', 'dow-jones']]) { const mk = MARKETS.find(x => x.slug === slug); series[tag] = (mk && adjusted(mk).rows) || []; }
+  const stamp = key + '|' + today + '|' + Object.values(series).map(s => s.length).join(',') + '|' + (cache.ts.macro.calendar || 0), hit = calMemo.get(key);
+  if (hit && hit.stamp === stamp) return hit.val;
+  const val = { months: calendarMonths(now), ...MONTHCAL.monthCalendar({ year: y, month: m - 1, series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], today }) };
+  calMemo.set(key, { stamp, val });
+  return val;
+}
+
 // ---- Fiabilité des signaux (reliability.js) : historique rejoué semaine par semaine pour chaque marché ----
 // Le calcul complet prend environ 1,5 s en local mais jusqu'à 25 s sur un petit serveur (Render) : la requête n'attend pas la fin du calcul.
 // Il n'est lancé qu'à la demande (visite de la page Fiabilité), un marché à la fois en rendant la main entre deux marchés : les autres requêtes
@@ -457,6 +475,12 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/api/ratios') return send(res, 200, JSON.stringify(ratiosData()));
     if (u.pathname === '/api/reliability') return send(res, 200, JSON.stringify(reliabilityData()));
     if (u.pathname === '/api/volatility') { await macroData('yields').catch(() => {}); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.yields || 0, vol: volData() })); }
+    if (u.pathname === '/api/calendrier') {                                    // ?m=AAAA-MM (mois en cours par défaut)
+      const months = calendarMonths(), key = u.searchParams.get('m') || months[0];
+      if (!months.includes(key)) return send(res, 400, JSON.stringify({ error: 'mois non disponible', months }));
+      await macroData('calendar').catch(() => {});
+      return send(res, 200, JSON.stringify(calendarData(key)));
+    }
     if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6)));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');
@@ -508,6 +532,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/a-propos') return send(res, 200, docPage('about.html'), 'text/html');
     if (u.pathname === '/themes') return send(res, 200, fs.readFileSync(path.join(__dirname, 'themes.html')), 'text/html');
     if (u.pathname === '/inflation' || u.pathname === '/taux') return send(res, 200, fs.readFileSync(path.join(__dirname, u.pathname === '/inflation' ? 'inflation.html' : 'rates.html')), 'text/html');
+    if (u.pathname === '/calendrier') return send(res, 200, fs.readFileSync(path.join(__dirname, 'calendar.html')), 'text/html');
     if (u.pathname === '/fiabilite') return send(res, 200, fs.readFileSync(path.join(__dirname, 'reliability.html')), 'text/html');
     if (u.pathname === '/intermarket') return send(res, 200, fs.readFileSync(path.join(__dirname, 'intermarket.html')), 'text/html');
     if (u.pathname === '/compare') return send(res, 200, fs.readFileSync(path.join(__dirname, 'compare.html')), 'text/html');

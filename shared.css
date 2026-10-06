@@ -319,3 +319,13 @@ html.bd-loading body::after{content:'';position:fixed;z-index:10000;top:50%;left
 @media (prefers-reduced-motion:reduce){.bd-spin{animation-duration:2.4s}}
 .logo{display:inline-flex;align-items:center;gap:9px}.logo-mark{width:30px;height:30px;border-radius:7px;flex:none}
 @media (max-width:600px){.logo-mark{width:26px;height:26px}}
+/* calendrier des indices */
+table.cal th[scope=row]{white-space:nowrap;vertical-align:top}table.cal td{vertical-align:top;text-align:left}
+table.cal tr.cal-off th,table.cal tr.cal-off td{opacity:.55}
+table.cal tr.cal-today th,table.cal tr.cal-today td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.cal-per{color:var(--muted);white-space:nowrap}
+.cal-ev{list-style:none;margin:0;padding:0}.cal-ev li{margin:2px 0;padding-left:10px;border-left:3px solid var(--line);line-height:1.4}
+.cal-ev li small{color:var(--muted)}.ev-t{font-variant-numeric:tabular-nums;font-weight:600;margin-right:4px}
+.cal-ev li.ev-high{border-left-color:var(--redl)}.cal-ev li.ev-medium{border-left-color:var(--gold)}.cal-ev li.ev-low{border-left-color:var(--muted)}
+span.ev-high{color:var(--redl)}span.ev-medium{color:var(--gold)}span.ev-low{color:var(--muted)}
+#calM{margin:6px 0 16px;flex-wrap:wrap}
