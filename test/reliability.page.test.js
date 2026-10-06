@@ -111,7 +111,13 @@ test('/calendrier et /api/calendrier : page servie, mois en cours par défaut, m
   const p = await get('/calendrier'); assert.equal(p.status, 200); assert.match(p.body, /data-page="calendar"/); assert.match(p.body, /<script src="\/calendarview\.js">/);
   assert.equal((await get('/calendarview.js')).status, 200); assert.equal((await get('/monthcal.js')).status, 404, 'module de calcul côté serveur');
   const c = JSON.parse((await get('/api/calendrier')).body);
-  assert.ok(c.months.length >= 2); assert.equal(`${c.year}-${String(c.month + 1).padStart(2, '0')}`, c.months[0]); assert.ok(c.days.length >= 28 && c.days.some(d => d.today));
+  const cur = `${c.year}-${String(c.month + 1).padStart(2, '0')}`, i = c.months.indexOf(cur);
+  assert.equal(c.view, 'month'); assert.equal(i, 6, 'six mois passés consultables, puis le mois en cours'); assert.ok(c.months.length >= 8, 'au moins le mois suivant');
+  assert.ok(c.days.length >= 28 && c.days.some(d => d.today)); assert.match(c.thisWeek, /^\d{4}-\d{2}-\d{2}$/);
+  const w = JSON.parse((await get('/api/calendrier?w=' + c.thisWeek)).body);
+  assert.equal(w.view, 'week'); assert.equal(w.days.length, 7); assert.equal(w.days[0].weekday, 'lun.'); assert.ok(w.days.some(d => d.today)); assert.match(w.label, /^semaine du /);
+  assert.equal((await get('/api/calendrier?w=2026-10-07')).status, 400, 'une semaine commence un lundi');
+  assert.equal((await get('/api/calendrier?w=1999-01-04')).status, 400, 'hors période');
   const bad = await get('/api/calendrier?m=1999-01'); assert.equal(bad.status, 400); assert.ok(JSON.parse(bad.body).months);
   for (const f of ['about.html', 'compare.html', 'screener.html', 'themes.html', 'inflation.html', 'rates.html', 'intermarket.html', 'reliability.html', 'calendar.html'])
     assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /Fiabilité<\/a><\/li><li><a href="\/calendrier"[^>]*>Calendrier<\/a><\/li>/, f);

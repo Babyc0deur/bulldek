@@ -17,6 +17,9 @@ services:
       # Facultative : clé gratuite financialmodelingprep.com ; ajoute le chiffre publié des annonces au calendrier (à saisir dans le tableau de bord Render).
       - key: FMP_API_KEY
         sync: false
+      # Facultative : clé gratuite fred.stlouisfed.org ; le calendrier des indices lit alors seul les dates officielles à venir (à saisir dans le tableau de bord Render).
+      - key: FRED_API_KEY
+        sync: false
       - key: TRUST_PROXY
         value: "1"
       - key: RATE_API

@@ -59,18 +59,42 @@ test('saisonnalité commune : sens et « fort » par période, lecture d\'ensemb
   assert.equal(MC.reading([{ dir: 1, strong: true, regular: true }, { dir: 1, strong: false, regular: false }, { dir: 0 }]).irregular, true);
 });
 
-test('page : boutons des mois, jour courant, jours fermés, annonces colorées par importance, points saillants', async () => {
-  const day = (n, o) => ({ date: `2026-10-${String(n).padStart(2, '0')}`, day: n, weekday: 'mer.', weekend: false, open: true, holiday: null, today: false,
-    season: { key: 'neutral', label: 'Neutre', irregular: false, periods: Object.fromEntries([15, 20, 25].map(p => [p, { dir: 0, strong: false, ES: { mean: 0.1, up: 6, n: 10 }, NQ: { mean: -0.1, up: 4, n: 10 }, YM: { mean: 0, up: 5, n: 10 } }])) }, events: [], ...o });
-  const DATA = { year: 2026, month: 9, label: 'octobre 2026', periods: [15, 20, 25], months: ['2026-10', '2026-11', '2026-12'], officialUntil: '2026-12-31',
-    days: [day(6, { today: true }), day(10, { weekday: 'sam.', weekend: true, open: false }), day(14, { events: [{ time: '08:30', kind: 'cpi', label: 'Inflation (CPI)', impact: 'high', source: 'officiel' }] }),
-      day(28, { season: { ...day(1).season, key: 'up-strong', label: 'Haussier fort' }, events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })] };
-  const { root } = await render({ src: path.join(__dirname, '..', 'calendarview.js'), fnName: '((a, root) => renderCalendar(a, root))', args: DATA, now: Date.parse('2026-10-06T12:00:00Z'), calc: {} });
-  const h = root.innerHTML, text = h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-  assert.match(h, /data-m="2026-10" aria-pressed="true">octobre 2026/); assert.match(h, /data-m="2026-12"[^>]*>décembre 2026/);
+// ---------- page ----------
+const day = (n, o) => ({ date: `2026-10-${String(n).padStart(2, '0')}`, day: n, weekday: 'mer.', weekend: false, open: true, holiday: null, today: false,
+  season: { key: 'neutral', label: 'Neutre', irregular: false, periods: Object.fromEntries([15, 20, 25].map(p => [p, { dir: 0, strong: false, ES: { mean: 0.1, up: 6, n: 10 }, NQ: { mean: -0.1, up: 4, n: 10 }, YM: { mean: 0, up: 5, n: 10 } }])) }, events: [], ...o });
+const MONTH = { view: 'month', year: 2026, month: 9, start: '2026-10-01', label: 'octobre 2026', periods: [15, 20, 25], months: ['2026-09', '2026-10', '2026-11'], officialUntil: '2026-12-23',
+  today: '2026-10-06', thisWeek: '2026-10-05',
+  days: [day(6, { today: true }), day(10, { weekday: 'sam.', weekend: true, open: false }), day(14, { events: [{ time: '08:30', kind: 'cpi', label: 'Inflation (CPI)', impact: 'high', source: 'officiel' }] }),
+    day(28, { season: { ...day(1).season, key: 'up-strong', label: 'Haussier fort' }, events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })] };
+const runPage = (data, calls) => render({ src: path.join(__dirname, '..', 'calendarview.js'), fnName: '((a, root) => renderCalendar(a.data, root, q => a.calls.push(q)))', args: { data, calls }, now: Date.parse('2026-10-06T12:00:00Z'), calc: {} });
+
+test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif sur le mois en cours, jour courant, jours fermés, annonces colorées, points saillants', async () => {
+  const calls = [], { root } = await runPage(MONTH, calls), h = root.innerHTML, text = h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(h, /id="calPrev"\s+aria-label="Mois précédent">‹/); assert.match(h, /id="calTitle" aria-live="polite">octobre 2026</); assert.match(h, /id="calNext"\s+aria-label="Mois suivant">›/);
+  assert.match(h, /id="calToday" disabled>/); assert.match(h, /data-v="month" aria-pressed="true">Mois/);
   assert.match(h, /<tr class="cal-today">/); assert.match(h, /aujourd'hui/); assert.match(h, /<tr class="cal-off">[\s\S]*?week-end/);
   assert.match(h, /<li class="ev-high"><span class="ev-t">08:30<\/span> Inflation \(CPI\) <small>officiel<\/small><\/li>/);
   assert.match(text, /Saisonnalité forte : mer\. 28 \(haussier fort\)/); assert.match(text, /le mer\. 28, la saisonnalité forte coïncide avec Décision de la Fed/);
-  assert.match(text, /Grosses annonces sans tendance saisonnière nette : mer\. 14 \(Inflation\)/);
-  assert.match(text, /15 a · · 20 a · · 25 a ·/);
+  assert.match(text, /Grosses annonces sans tendance saisonnière nette : mer\. 14 \(Inflation\)/); assert.match(text, /15 a · · 20 a · · 25 a ·/);
+});
+
+test('page : flèches (mois précédent / suivant, bornées à la période), passage en vue semaine sur la semaine en cours', async () => {
+  const calls = [], { el } = await runPage(MONTH, calls);
+  el('#calPrev').onclick(); el('#calNext').onclick();
+  el('#calView').onclick({ target: { closest: () => ({ dataset: { v: 'week' } }) } });
+  assert.deepEqual(calls, [{ m: '2026-09' }, { m: '2026-11' }, { w: '2026-10-05' }]);
+  const last = [], { root } = await runPage({ ...MONTH, year: 2026, month: 10, months: ['2026-10', '2026-11'] }, last);
+  assert.match(root.innerHTML, /id="calNext" disabled/, 'dernier mois disponible : flèche suivante inactive');
+  assert.match(root.innerHTML, /id="calToday" >|id="calToday">/, '« Aujourd\'hui » actif hors du mois en cours');
+});
+
+test('page, vue semaine : sept cases, semaine à cheval sur deux mois, flèches de semaine, retour à la vue mois', async () => {
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.UTC(2026, 8, 28 + i)); return day(d.getUTCDate(), { date: d.toISOString().slice(0, 10), weekday: ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'][i], weekend: i > 4, open: i < 5 }); });
+  const WEEK = { ...MONTH, view: 'week', year: 2026, month: 8, start: '2026-09-28', label: 'semaine du 28 septembre au 4 octobre 2026', days };
+  const calls = [], { root, el } = await runPage(WEEK, calls), h = root.innerHTML;
+  assert.equal((h.match(/class="card cal-day/g) || []).length, 7); assert.match(h, /semaine du 28 septembre au 4 octobre 2026/);
+  assert.match(h, /lun\. 28 sept/); assert.match(h, /jeu\. 1 oct/); assert.match(h, /aria-label="Semaine précédente"/);
+  el('#calPrev').onclick(); el('#calNext').onclick(); el('#calToday').onclick();
+  el('#calView').onclick({ target: { closest: () => ({ dataset: { v: 'month' } }) } });
+  assert.deepEqual(calls, [{ w: '2026-09-21' }, { w: '2026-10-05' }, { w: '2026-10-05' }, { m: '2026-09' }]);
 });

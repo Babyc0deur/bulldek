@@ -328,4 +328,15 @@ table.cal tr.cal-today th,table.cal tr.cal-today td{background:color-mix(in srgb
 .cal-ev li small{color:var(--muted)}.ev-t{font-variant-numeric:tabular-nums;font-weight:600;margin-right:4px}
 .cal-ev li.ev-high{border-left-color:var(--redl)}.cal-ev li.ev-medium{border-left-color:var(--gold)}.cal-ev li.ev-low{border-left-color:var(--muted)}
 span.ev-high{color:var(--redl)}span.ev-medium{color:var(--gold)}span.ev-low{color:var(--muted)}
-#calM{margin:6px 0 16px;flex-wrap:wrap}
+
+/* calendrier : barre de navigation (flèches, titre, aujourd'hui, mois / semaine) et vue semaine */
+.cal-nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:6px 0 16px}
+.cal-move{display:flex;align-items:center;gap:8px;min-width:0}
+.cal-arrow{padding:6px 14px;font-size:1.25rem;line-height:1}.cal-arrow:disabled,#calToday:disabled{opacity:.4;cursor:default}
+.cal-title{margin:0 6px;font-size:1.2rem;min-width:12ch;text-align:center}.cal-title::first-letter{text-transform:uppercase}
+.cal-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.cal-tools .ranges{margin:0}
+.cal-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.cal-week>*{min-width:0}.cal-day{margin:0;padding:10px}.cal-day h3{margin:0 0 6px;font-size:.92rem}.cal-day .cal-s{margin-bottom:8px}
+.cal-day.cal-off{opacity:.55}.cal-day.cal-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+@media (max-width:1100px){.cal-week{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:700px){.cal-week{grid-template-columns:1fr}.cal-title{min-width:0;font-size:1.05rem}}

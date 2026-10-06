@@ -20,7 +20,7 @@ const STATIC = {
 const SCRIPTS = new Set(['calendarview.js', 'reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./reliability.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -195,7 +195,7 @@ const sequential = async (urls, fn) => {
   for (const u of urls) for (let n = 1; ; n++) { try { out.push(await fn(u)); break; } catch (e) { if (n >= 6) throw e; } }
   return out;
 };
-const MACRO_TTL = { cpi: 24 * 3600e3, rates: 24 * 3600e3, calendar: 3 * 3600e3, yields: 6 * 3600e3 };
+const MACRO_TTL = { cpi: 24 * 3600e3, rates: 24 * 3600e3, calendar: 3 * 3600e3, yields: 6 * 3600e3, releases: 24 * 3600e3 };
 const MACRO_RETRY_MS = 60 * 60e3;
 const macroFail = {};
 const MACRO_FETCH = {
@@ -205,6 +205,24 @@ const MACRO_FETCH = {
     const parts = [];
     for (const [key, url] of YIELDS.yieldsUrls()) { parts.push([key, await getText(url)]); await sleep(300); }
     return YIELDS.parseYields(parts);
+  },
+  // Dates officielles à venir (releases.js) : page FOMC de la Fed (sans clé) et, avec FRED_API_KEY, dates programmées des statistiques sur FRED.
+  // Une statistique en échec n'empêche pas les autres ; sans aucune date, l'échec est signalé (nouvel essai une heure plus tard).
+  releases: async () => {
+    const from = new Date(Date.now() - 62 * 864e5).toISOString().slice(0, 10), fred = {};
+    let fomc = [];
+    try { fomc = RELEASES.parseFomcPage(await getText(RELEASES.FOMC_URL)); } catch (e) { log('calendrier officiel : page FOMC illisible (' + e.message + ')'); }
+    const key = process.env.FRED_API_KEY;
+    if (key) {
+      for (const [kind, [rid]] of Object.entries(RELEASES.RELEASES)) {
+        try { fred[kind] = RELEASES.parseFredDates(await getJSON(RELEASES.fredUrl(key, rid, from)), from); } catch (e) { log('calendrier officiel : FRED ' + kind + ' indisponible (' + e.message + ')'); }
+        await sleep(300);
+      }
+    } else logV('calendrier officiel : FRED_API_KEY absente, seules les décisions de la Fed sont lues automatiquement');
+    const out = RELEASES.build({ fred, fomc });
+    if (!out.events.length && !out.fomc.length) throw new Error('aucune date officielle lue');
+    logV('calendrier officiel : ' + out.fomc.length + ' réunions de la Fed, ' + out.events.length + ' publications FRED (' + Object.keys(fred).length + ' statistiques)');
+    return out;
   },
   calendar: async () => {
     const key = process.env.FMP_API_KEY;                                   // facultative : avec elle, le calendrier inclut le chiffre publié
@@ -374,18 +392,21 @@ function volData() {
 // ---- Calendrier du mois (monthcal.js) : saisonnalité commune ES / NQ / YM et annonces, heure de New York ----
 // Mois proposés : du mois en cours (à New York) jusqu'au dernier mois couvert par les calendriers officiels, et au moins le mois suivant.
 function calendarMonths(now = Date.now()) {
-  const [y, m] = MONTHCAL.nyDate(now).split('-').map(Number), end = MONTHCAL.OFFICIAL.at(-1)[0].slice(0, 7), out = [];
-  for (let k = 0; k < 24; k++) { const yy = y + Math.floor((m - 1 + k) / 12), mm = (m - 1 + k) % 12, key = yy + '-' + String(mm + 1).padStart(2, '0'); if (k > 1 && key > end) break; out.push(key); }
+  const [y, m] = MONTHCAL.nyDate(now).split('-').map(Number), end = MONTHCAL.knownUntil(cache.macro.releases).slice(0, 7), out = [];
+  for (let k = -6; k <= 12; k++) { const i = (m - 1) + k, yy = y + Math.floor(i / 12), mm = ((i % 12) + 12) % 12, key = yy + '-' + String(mm + 1).padStart(2, '0'); if (k > 1 && key > end) break; out.push(key); }
   return out;
 }
 const calMemo = new Map();
-function calendarData(key, now = Date.now()) {
+function calendarData(key, now = Date.now(), week = null) {
   const [y, m] = key.split('-').map(Number), today = MONTHCAL.nyDate(now);
   const series = {}; for (const [tag, slug] of [['ES', 'sp500'], ['NQ', 'nasdaq-100'], ['YM', 'dow-jones']]) { const mk = MARKETS.find(x => x.slug === slug); series[tag] = (mk && adjusted(mk).rows) || []; }
-  const stamp = key + '|' + today + '|' + Object.values(series).map(s => s.length).join(',') + '|' + (cache.ts.macro.calendar || 0), hit = calMemo.get(key);
+  const id = week || key, stamp = id + '|' + today + '|' + Object.values(series).map(s => s.length).join(',') + '|' + (cache.ts.macro.calendar || 0) + '|' + (cache.ts.macro.releases || 0), hit = calMemo.get(id);
   if (hit && hit.stamp === stamp) return hit.val;
-  const val = { months: calendarMonths(now), ...MONTHCAL.monthCalendar({ year: y, month: m - 1, series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], today }) };
-  calMemo.set(key, { stamp, val });
+  const opts = { series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], auto: cache.macro.releases || null, today };
+  const months = calendarMonths(now), monday = MONTHCAL.nyDate(Date.parse(today + 'T12:00:00Z') - ((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7) * 864e5);
+  const val = { months, today, thisWeek: monday, ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
+  if (calMemo.size > 60) calMemo.clear();
+  calMemo.set(id, { stamp, val });
   return val;
 }
 
@@ -475,10 +496,18 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     if (u.pathname === '/api/ratios') return send(res, 200, JSON.stringify(ratiosData()));
     if (u.pathname === '/api/reliability') return send(res, 200, JSON.stringify(reliabilityData()));
     if (u.pathname === '/api/volatility') { await macroData('yields').catch(() => {}); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.yields || 0, vol: volData() })); }
-    if (u.pathname === '/api/calendrier') {                                    // ?m=AAAA-MM (mois en cours par défaut)
-      const months = calendarMonths(), key = u.searchParams.get('m') || months[0];
+    if (u.pathname === '/api/calendrier') {                                    // ?m=AAAA-MM (mois, mois en cours par défaut) ou ?w=AAAA-MM-JJ (semaine commençant ce lundi)
+      const months = calendarMonths(), cur = MONTHCAL.nyDate(Date.now()).slice(0, 7), w = u.searchParams.get('w');
+      if (w != null) {
+        const t = Date.parse(w + 'T00:00:00Z');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(w) || !isFinite(t) || new Date(t).getUTCDay() !== 1) return send(res, 400, JSON.stringify({ error: 'semaine : un lundi au format AAAA-MM-JJ', months }));
+        if (!months.includes(w.slice(0, 7)) && !months.includes(new Date(t + 6 * 864e5).toISOString().slice(0, 7))) return send(res, 400, JSON.stringify({ error: 'semaine non disponible', months }));
+        await macroData('calendar').catch(() => {}); macroData('releases').catch(() => {});
+        return send(res, 200, JSON.stringify(calendarData(w.slice(0, 7), Date.now(), w)));
+      }
+      const key = u.searchParams.get('m') || cur;
       if (!months.includes(key)) return send(res, 400, JSON.stringify({ error: 'mois non disponible', months }));
-      await macroData('calendar').catch(() => {});
+      await macroData('calendar').catch(() => {}); macroData('releases').catch(() => {});
       return send(res, 200, JSON.stringify(calendarData(key)));
     }
     if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6)));
@@ -556,7 +585,7 @@ process.on('unhandledRejection', e => log('rejet non géré :', e && e.message))
 const stale = MARKETS.some(m => Date.now() - (cache.ts.weekly[m.code] || 0) > REFRESH_MS || !cache.weekly[m.code] || !cache.cot[m.code] || !cache.daily[m.code] || cache.daily[m.code][0].length < 4 || (m.disagg && !cache.disagg[m.code]) || (ADJ.CASH[m.slug] && !cache.cash[m.code]));
 if (!process.env.NO_REFRESH) {
   // Le débrief a besoin du calendrier et des séries FRED : on les charge tout de suite, sans attendre la mise à jour des 37 marchés (environ 2 min).
-  for (const n of ['calendar', 'yields']) macroData(n).catch(() => {});
+  for (const n of ['calendar', 'yields', 'releases']) macroData(n).catch(() => {});
   logV(stale ? 'cache incomplet ou périmé : mise à jour au démarrage' : 'cache à jour : prochaine mise à jour dans ' + REFRESH_MS / 36e5 + ' h');
   if (stale) refreshAll();
   setInterval(refreshAll, REFRESH_MS);

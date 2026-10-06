@@ -68,8 +68,14 @@ const isOpen = (t, H) => { const w = new Date(t).getUTCDay(); return w !== 0 && 
 const nyTime = t => new Intl.DateTimeFormat('fr-FR', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(t));
 const nyDate = t => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
 
-// Annonces du mois (année, mois 0-11) : { 'AAAA-MM-JJ': [{ time, kind, label, impact, source }] }. ff = calendrier Forex Factory du site (macro.parseCalendar).
-function monthEvents(year, month, ff = []) {
+// Libellé du PIB d'après le mois de publication : 1re estimation le mois suivant la fin du trimestre + 1 (janv., avr., juil., oct.), puis 2e et 3e.
+function gdpLabel(d) {
+  const m = +d.slice(5, 7) - 1, q = m < 3 ? 4 : Math.floor(m / 3), est = ['1re', '2e', '3e'][m % 3];
+  return `PIB du ${q === 1 ? '1er' : q + 'e'} trimestre (${est} estimation)`;
+}
+// Annonces du mois (année, mois 0-11) : { 'AAAA-MM-JJ': [{ time, kind, label, impact, source }] }. ff = calendrier Forex Factory du site (macro.parseCalendar) ;
+// auto = dates lues automatiquement (releases.js → { fomc: [...], events: [[date, heure, type]] }), qui complètent la table OFFICIAL et la remplacent à terme.
+function monthEvents(year, month, ff = [], auto = null) {
   const H = { ...nyseDays(year - 1), ...nyseDays(year), ...nyseDays(year + 1) }, prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const ev = {}, put = (date, e) => { if (date.startsWith(prefix)) (ev[date] ||= []).push(e); };
   const mk = (kind, time, source, label) => ({ time, kind, label: label || KINDS[kind][0], impact: KINDS[kind][1], source });
@@ -77,17 +83,23 @@ function monthEvents(year, month, ff = []) {
   for (const [d, time, kind, label] of OFFICIAL) put(d, mk(kind, time, 'officiel', label));
   for (const d of KD.CPI) put(d, mk('cpi', '08:30', 'officiel'));
   for (const d of KD.NFP) put(d, mk('nfp', '08:30', 'officiel'));
-  for (const f of KD.FOMC) {
-    const d = f.slice(0, 10), sep = f.endsWith('*');
-    put(d, mk('fomc', '14:00', 'officiel', 'Décision de la Fed (FOMC)' + (sep ? ', avec projections économiques' : '') + ' ; conférence de presse à 14 h 30'));
-    put(ymd(Date.parse(d) + 21 * DAY), mk('minutes', '14:00', 'officiel'));                     // la Fed publie le compte rendu trois semaines après la décision
+  const autoKinds = new Set();                                                // types fournis par FRED ce mois-ci : remplacent les rendez-vous « habituels »
+  for (const [d, time, kind] of (auto && auto.events) || []) {
+    if (!d.startsWith(prefix) || !KINDS[kind] || (ev[d] || []).some(x => x.kind === kind)) continue;
+    autoKinds.add(kind);
+    put(d, mk(kind, time, 'officiel', kind === 'gdp' ? gdpLabel(d) : undefined));
+  }
+  const fomc = new Map(); for (const f of [...KD.FOMC, ...((auto && auto.fomc) || [])]) { const d = f.slice(0, 10); fomc.set(d, fomc.get(d) || f.endsWith('*')); }
+  for (const [d, sep] of fomc) {
+    if (!(ev[d] || []).some(x => x.kind === 'fomc')) put(d, mk('fomc', '14:00', 'officiel', 'Décision de la Fed (FOMC)' + (sep ? ', avec projections économiques' : '') + ' ; conférence de presse à 14 h 30'));
+    const md = ymd(Date.parse(d) + 21 * DAY); if (!(ev[md] || []).some(x => x.kind === 'minutes')) put(md, mk('minutes', '14:00', 'officiel'));                     // la Fed publie le compte rendu trois semaines après la décision
   }
   // Rendez-vous habituels (dates exactes non publiées longtemps à l'avance) et échéances calculées par règle.
   for (let t = utc(year, month, 1); new Date(t).getUTCMonth() === month; t += DAY) {
     const w = new Date(t).getUTCDay(), d = ymd(t), dom = new Date(t).getUTCDate();
-    if (w === 4) { let c = t; if (!isOpen(c, H)) c -= DAY; put(ymd(c), mk('claims', '08:30', 'habituel')); }        // jeudi ; veille si férié (Thanksgiving)
-    if (w === 5 && dom >= 8 && dom <= 14 && isOpen(t, H)) put(d, mk('umich', '10:00', 'habituel', 'Confiance des consommateurs (Michigan, préliminaire)'));
-    if (w === 5 && dom >= 22 && dom <= 28 && isOpen(t, H)) put(d, mk('umich', '10:00', 'habituel', 'Confiance des consommateurs (Michigan, définitive)'));
+    if (w === 4 && !autoKinds.has('claims')) { let c = t; if (!isOpen(c, H)) c -= DAY; put(ymd(c), mk('claims', '08:30', 'habituel')); }        // jeudi ; veille si férié (Thanksgiving)
+    if (w === 5 && dom >= 8 && dom <= 14 && isOpen(t, H) && !autoKinds.has('umich')) put(d, mk('umich', '10:00', 'habituel', 'Confiance des consommateurs (Michigan, préliminaire)'));
+    if (w === 5 && dom >= 22 && dom <= 28 && isOpen(t, H) && !autoKinds.has('umich')) put(d, mk('umich', '10:00', 'habituel', 'Confiance des consommateurs (Michigan, définitive)'));
   }
   const biz = []; for (let t = utc(year, month, 1); new Date(t).getUTCMonth() === month; t += DAY) if (isOpen(t, H)) biz.push(t);
   if (biz[0]) put(ymd(biz[0]), mk('ismMfg', '10:00', 'habituel'));
@@ -154,20 +166,36 @@ function reading(dirs) {
   return { key, label, irregular: irr && key !== 'neutral' && key !== 'mixed' };
 }
 
-// Calendrier complet d'un mois. ff : calendrier Forex Factory ; caps : années maximales par indice.
+// Jours d'une plage de dates [start, start + count jours[. ff : calendrier Forex Factory ; auto : dates lues automatiquement ; caps : années maximales par indice.
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-function monthCalendar({ year, month, series, caps = {}, ff = [], today = null }) {
-  const stats = dayStats(series, year, month, caps), { events, holidays } = monthEvents(year, month, ff);
-  const days = [];
-  for (let t = utc(year, month, 1); new Date(t).getUTCMonth() === month; t += DAY) {
+function rangeDays({ start, count, series, caps = {}, ff = [], auto = null, today = null }) {
+  const perMonth = new Map(), monthData = (y, m) => { const k = y * 12 + m; if (!perMonth.has(k)) perMonth.set(k, { stats: dayStats(series, y, m, caps), ...monthEvents(y, m, ff, auto) }); return perMonth.get(k); };
+  const days = [], t0 = Date.parse(start + 'T00:00:00Z');
+  for (let t = t0; t < t0 + count * DAY; t += DAY) {
+    const { stats, events, holidays } = monthData(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth());
     const d = ymd(t), w = new Date(t).getUTCDay(), dom = new Date(t).getUTCDate(), hol = holidays[d] || null;
     const open = w !== 0 && w !== 6 && !(hol && hol.kind === 'closed');
     const per = Object.fromEntries(PERIODS.map(n => { const st = stats(dom, n); return [n, { ...periodDir(st), ...st }]; }));
     days.push({ date: d, day: dom, weekday: WD[w], weekend: w === 0 || w === 6, open, holiday: hol, today: d === today,
       season: { ...reading(PERIODS.map(n => per[n])), periods: per }, events: events[d] || [] });
   }
+  return days;
+}
+// Dernière date officielle connue (table saisie ou dates lues automatiquement).
+const knownUntil = auto => [OFFICIAL_UNTIL, ...(((auto && auto.events) || []).map(e => e[0])), ...(((auto && auto.fomc) || []).map(f => f.slice(0, 10)))].sort().at(-1);
+// Calendrier d'un mois.
+function monthCalendar({ year, month, series, caps = {}, ff = [], auto = null, today = null }) {
+  const start = ymd(utc(year, month, 1)), count = new Date(utc(year, month + 1, 0)).getUTCDate();
   const label = new Date(utc(year, month, 1)).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  return { year, month, label, periods: PERIODS, caps, officialUntil: OFFICIAL_UNTIL, nfpCpiUntil: KD.OFFICIAL_UNTIL.cpi, fomcUntil: KD.OFFICIAL_UNTIL.fomc, days };
+  return { view: 'month', year, month, start, label, periods: PERIODS, caps, officialUntil: knownUntil(auto), days: rangeDays({ start, count, series, caps, ff, auto, today }) };
+}
+// Calendrier d'une semaine (lundi → dimanche), éventuellement à cheval sur deux mois.
+function weekCalendar({ monday, series, caps = {}, ff = [], auto = null, today = null }) {
+  const t = Date.parse(monday + 'T00:00:00Z'), end = new Date(t + 6 * DAY), a = new Date(t);
+  const fmt = (d, o) => d.toLocaleDateString('fr-FR', { timeZone: 'UTC', ...o });
+  const label = a.getUTCMonth() === end.getUTCMonth() ? `semaine du ${a.getUTCDate()} au ${fmt(end, { day: 'numeric', month: 'long', year: 'numeric' })}`
+    : `semaine du ${fmt(a, { day: 'numeric', month: 'long' })} au ${fmt(end, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  return { view: 'week', year: a.getUTCFullYear(), month: a.getUTCMonth(), start: monday, label, periods: PERIODS, caps, officialUntil: knownUntil(auto), days: rangeDays({ start: monday, count: 7, series, caps, ff, auto, today }) };
 }
 
-module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, periodDir, reading, monthCalendar, nyDate, PERIODS };
+module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, periodDir, reading, monthCalendar, weekCalendar, rangeDays, knownUntil, gdpLabel, nyDate, PERIODS };
