@@ -209,18 +209,19 @@ const MACRO_FETCH = {
   // Dates officielles à venir (releases.js) : page FOMC de la Fed (sans clé) et, avec FRED_API_KEY, dates programmées des statistiques sur FRED.
   // Une statistique en échec n'empêche pas les autres ; sans aucune date, l'échec est signalé (nouvel essai une heure plus tard).
   releases: async () => {
-    const from = new Date(Date.now() - 62 * 864e5).toISOString().slice(0, 10), fred = {};
+    const from = new Date(Date.now() - 62 * 864e5).toISOString().slice(0, 10), fred = {}, failed = {};
     let fomc = [];
-    try { fomc = RELEASES.parseFomcPage(await getText(RELEASES.FOMC_URL)); } catch (e) { log('calendrier officiel : page FOMC illisible (' + e.message + ')'); }
+    try { fomc = RELEASES.parseFomcPage(await getText(RELEASES.FOMC_URL)); if (!fomc.length) failed.fomc = 'page lue mais aucune réunion trouvée'; }
+    catch (e) { failed.fomc = String(e.message).slice(0, 120); log('calendrier officiel : page FOMC illisible (' + e.message + ')'); }
     const key = process.env.FRED_API_KEY;
     if (key) {
       for (const [kind, [rid]] of Object.entries(RELEASES.RELEASES)) {
-        try { fred[kind] = RELEASES.parseFredDates(await getJSON(RELEASES.fredUrl(key, rid, from)), from); } catch (e) { log('calendrier officiel : FRED ' + kind + ' indisponible (' + e.message + ')'); }
+        try { fred[kind] = RELEASES.parseFredDates(await getJSON(RELEASES.fredUrl(key, rid, from)), from); } catch (e) { failed[kind] = String(e.message).slice(0, 120); log('calendrier officiel : FRED ' + kind + ' indisponible (' + e.message + ')'); }
         await sleep(300);
       }
     } else logV('calendrier officiel : FRED_API_KEY absente, seules les décisions de la Fed sont lues automatiquement');
-    const out = RELEASES.build({ fred, fomc });
-    if (!out.events.length && !out.fomc.length) throw new Error('aucune date officielle lue');
+    const out = { ...RELEASES.build({ fred, fomc }), fredKey: !!key, failed };
+    if (!out.events.length && !out.fomc.length) throw new Error('aucune date officielle lue : ' + Object.entries(failed).map(([k, v]) => k + ' ' + v).join(' ; ').slice(0, 300));
     logV('calendrier officiel : ' + out.fomc.length + ' réunions de la Fed, ' + out.events.length + ' publications FRED (' + Object.keys(fred).length + ' statistiques)');
     return out;
   },
@@ -242,7 +243,8 @@ async function refreshMacro(name) {
   const t0 = Date.now();
   logV('macro ' + name + ' : téléchargement…');
   const value = await MACRO_FETCH[name]();
-  if (!value || (name === 'calendar' ? !value.length : !Object.keys(Object.values(value)[0] || {}).length)) throw new Error('vide');
+  const empty = name === 'calendar' ? !value.length : name === 'releases' ? !((value.events || []).length || (value.fomc || []).length) : !Object.keys(Object.values(value)[0] || {}).length;
+  if (!value || empty) throw new Error('vide');
   commit('macro', name, value);
   logV('macro ' + name + ' : ok en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
   return value;
@@ -298,7 +300,12 @@ function statusSummary() {
   const all = MARKETS.map(status), count = l => all.filter(x => x.level === l).length;
   return { now: Date.now(), storage: store.kind, lastRefresh: cache.lastRefresh || null, uptimeSec: Math.round(process.uptime()),
     markets: { total: all.length, ok: count('ok'), warn: count('warn'), bad: count('bad') },
-    attention: all.filter(x => x.level !== 'ok').map(x => ({ slug: x.slug, name: x.name, level: x.level })) };
+    attention: all.filter(x => x.level !== 'ok').map(x => ({ slug: x.slug, name: x.name, level: x.level })),
+    // Sources macro : dernière mise à jour et dernier échec (message court, jamais de clé d'accès) ; détail de la lecture des dates officielles.
+    macro: Object.fromEntries(Object.keys(MACRO_TTL).map(n => [n, { updated: cache.ts.macro[n] || 0, error: errors['macro:' + n] ? errors['macro:' + n].msg : null,
+      retryAfter: macroFail[n] ? macroFail[n] + MACRO_RETRY_MS : null }])),
+    releases: cache.macro.releases ? { at: cache.macro.releases.at, fredKey: !!cache.macro.releases.fredKey, fomc: (cache.macro.releases.fomc || []).length,
+      events: (cache.macro.releases.events || []).length, failed: cache.macro.releases.failed || {} } : { fredKey: !!process.env.FRED_API_KEY, fomc: 0, events: 0 } };
 }
 
 // ---- Saisonnalité : rapport complet calculé une fois par jour et par marché, puis servi tel quel ----
