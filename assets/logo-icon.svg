@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-labelledby="t">
+  <title id="t">BullDesk</title>
+  <rect width="120" height="120" rx="26" fill="#0a0a08"/>
+  <rect x="2" y="2" width="116" height="116" rx="24" fill="none" stroke="#3d3720" stroke-width="2"/>
+  <!-- grandes oreilles -->
+  <g fill="#ffb000" fill-opacity=".2" stroke="#ffb000" stroke-width="5" stroke-linejoin="round">
+    <path d="M42 33 C 26 22 11 32 12 49 C 13 64 28 70 41 61 Z"/>
+    <path d="M78 33 C 94 22 109 32 108 49 C 107 64 92 70 79 61 Z"/>
+  </g>
+  <!-- tête -->
+  <path d="M41 62 Q 36 48 42 34 Q 50 23 60 23 Q 70 23 78 34 Q 84 48 79 62" fill="#0a0a08" stroke="#ffb000" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- défenses -->
+  <g fill="none" stroke="#f2dda6" stroke-width="4" stroke-linecap="round">
+    <path d="M49 64 Q 47 74 40 78"/>
+    <path d="M71 64 Q 73 74 80 78"/>
+  </g>
+  <!-- trompe : elle descend puis remonte en flèche, comme une tendance qui repart à la hausse -->
+  <path d="M60 56 C 60 80 64 95 76 97 C 86 98 93 91 97 81" fill="none" stroke="#ffb000" stroke-width="8" stroke-linecap="round"/>
+  <path d="M91 83 L 98 73 L 104 84" fill="none" stroke="#ffb000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- yeux -->
+  <g fill="#ffb000"><circle cx="51" cy="45" r="3.2"/><circle cx="69" cy="45" r="3.2"/></g>
+</svg>

@@ -15,6 +15,7 @@ const DEFAULT_SLUG = 'nasdaq-100';
 const STATIC = {
   '/shared.css': ['shared.css', 'text/css'],
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
+  '/favicon.svg': ['assets/logo-icon.svg', 'image/svg+xml'], '/logo.svg': ['assets/logo.svg', 'image/svg+xml'], '/loader.svg': ['assets/loader.svg', 'image/svg+xml'], '/logo-anim.svg': ['assets/logo-anim.svg', 'image/svg+xml'],
 };
 const SCRIPTS = new Set(['reliabilityview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
@@ -445,6 +446,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.setHeader('Allow', 'GET, HEAD'); return send(res, 405, '{"error":"méthode non autorisée"}'); }
   try {
     if (u.pathname === '/health') return send(res, 200, '{"ok":true}');
+    if (u.pathname === '/favicon.ico') { res.writeHead(301, { Location: '/favicon.svg' }); return res.end(); }
     if (u.pathname === '/api/status') {                                       // sans « code » : résumé global ; avec « code » : un marché
       const c = u.searchParams.get('code');
       if (!c) return send(res, 200, JSON.stringify(statusSummary()));

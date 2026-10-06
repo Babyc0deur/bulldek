@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="BullDesk" width="470"></p>
+
 # BullDesk
 
 Tableau de bord des marchés à terme : **saisonnalité**, **Williams %R** (14 jours) et **positionnement COT** (CFTC) sur 37 marchés, avec un **screener**, une **comparaison de deux marchés** et une page de **méthodologie**.

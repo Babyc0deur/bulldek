@@ -309,9 +309,13 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,su
 table.kd th[scope=row]{white-space:nowrap}table.kd td small{color:var(--muted)}
 /* écran de chargement (theme.js) : logo et anneau tournant par-dessus la page tant que ses données arrivent */
 html.bd-loading body{overflow:hidden}
-html.bd-loading body::before{content:'BULLDESK';position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--accent);display:flex;align-items:center;justify-content:center;padding-top:96px;font-weight:800;font-size:1.05rem;letter-spacing:.32em}
-html.bd-loading body::after{content:'';position:fixed;z-index:10000;top:50%;left:50%;width:44px;height:44px;margin:-38px 0 0 -22px;border:3px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);border-radius:50%;animation:bd-spin .8s linear infinite}
+html.bd-loading body::before{content:'BULLDESK';position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--accent);display:flex;align-items:center;justify-content:center;padding-top:150px;font-weight:800;font-size:1.05rem;letter-spacing:.32em}
+html.bd-loading body::after{content:'';position:fixed;z-index:10000;top:50%;left:50%;width:120px;height:150px;margin:-100px 0 0 -60px;background:url(/loader.svg) center/contain no-repeat;animation:bd-in .35s ease-out}
+@keyframes bd-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes bd-spin{to{transform:rotate(360deg)}}
 .bd-spin{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);border-radius:50%;animation:bd-spin .8s linear infinite}
 .rl-wait{padding:18px 0;color:var(--muted)}
-@media (prefers-reduced-motion:reduce){html.bd-loading body::after,.bd-spin{animation-duration:2.4s}}
+/* L'animation de chargement reste active même avec « moins d'animations » (choix du propriétaire du site) : courte, douce, sans clignotement. */
+@media (prefers-reduced-motion:reduce){.bd-spin{animation-duration:2.4s}}
+.logo{display:inline-flex;align-items:center;gap:9px}.logo-mark{width:30px;height:30px;border-radius:7px;flex:none}
+@media (max-width:600px){.logo-mark{width:26px;height:26px}}

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" width="120" height="150" role="img" aria-label="Chargement">
+  <!-- Écran de chargement : l'éléphant du logo bat des oreilles et lève la trompe ; trois chandeliers montent l'un après l'autre.
+       Animations SVG intégrées (SMIL) : ni script ni style en ligne, compatibles avec la politique de sécurité du site. -->
+  <!-- oreilles -->
+  <g fill="#ffb000" fill-opacity=".2" stroke="#ffb000" stroke-width="5" stroke-linejoin="round">
+    <path d="M42 33 C 26 22 11 32 12 49 C 13 64 28 70 41 61 Z">
+      <animateTransform attributeName="transform" type="rotate" values="0 42 45; -12 42 45; 0 42 45" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1; .45 0 .55 1"/>
+    </path>
+    <path d="M78 33 C 94 22 109 32 108 49 C 107 64 92 70 79 61 Z">
+      <animateTransform attributeName="transform" type="rotate" values="0 78 45; 12 78 45; 0 78 45" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1; .45 0 .55 1"/>
+    </path>
+  </g>
+  <!-- tête -->
+  <path d="M41 62 Q 36 48 42 34 Q 50 23 60 23 Q 70 23 78 34 Q 84 48 79 62" fill="#0a0a08" stroke="#ffb000" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- défenses -->
+  <g fill="none" stroke="#f2dda6" stroke-width="4" stroke-linecap="round">
+    <path d="M49 64 Q 47 74 40 78"/>
+    <path d="M71 64 Q 73 74 80 78"/>
+  </g>
+  <!-- trompe et flèche : se lèvent et redescendent -->
+  <g fill="none" stroke="#ffb000" stroke-linecap="round" stroke-linejoin="round">
+    <animateTransform attributeName="transform" type="rotate" values="6 60 56; -14 60 56; 6 60 56" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1; .45 0 .55 1"/>
+    <path d="M60 56 C 60 80 64 95 76 97 C 86 98 93 91 97 81" stroke-width="8"/>
+    <path d="M91 83 L 98 73 L 104 84" stroke-width="5"/>
+  </g>
+  <!-- yeux : clignement -->
+  <g fill="#ffb000">
+    <ellipse cx="51" cy="45" rx="3.2" ry="3.2"><animate attributeName="ry" values="3.2;3.2;0.4;3.2" keyTimes="0;0.9;0.95;1" dur="3.2s" repeatCount="indefinite"/></ellipse>
+    <ellipse cx="69" cy="45" rx="3.2" ry="3.2"><animate attributeName="ry" values="3.2;3.2;0.4;3.2" keyTimes="0;0.9;0.95;1" dur="3.2s" repeatCount="indefinite"/></ellipse>
+  </g>
+  <!-- chandeliers : montent l'un après l'autre -->
+  <g fill="#ffb000">
+    <rect x="38" width="10" rx="2" y="146" height="0">
+      <animate attributeName="height" values="0;14;14;0" keyTimes="0;0.3;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="146;132;132;146" keyTimes="0;0.3;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="55" width="10" rx="2" y="146" height="0">
+      <animate attributeName="height" values="0;0;22;22;0" keyTimes="0;0.15;0.45;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="146;146;124;124;146" keyTimes="0;0.15;0.45;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="72" width="10" rx="2" y="146" height="0">
+      <animate attributeName="height" values="0;0;30;30;0" keyTimes="0;0.3;0.6;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="y" values="146;146;116;116;146" keyTimes="0;0.3;0.6;0.8;1" dur="1.6s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>
