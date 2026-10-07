@@ -44,3 +44,15 @@ test('débrief des indices : paragraphe volatilité et dates clés ; rien pour l
   assert.equal(N.volStory({ group: 'Metals' }, { slug: 'gold', name: 'Or', group: 'Metals' }, { vol, keyDates }), null);
   assert.equal(N.volStory({ group: 'Indices' }, { slug: 'sp500', group: 'Indices' }, { vol: null, keyDates: [] }), null);
 });
+
+test('dates clés : les dates lues chaque jour (FRED, page de la Fed) complètent les listes saisies et repoussent leur limite', () => {
+  const auto = { fomc: ['2027-01-27', '2027-03-17*'], events: [['2027-01-13', '08:30', 'cpi'], ['2027-01-08', '08:30', 'nfp'], ['2026-10-14', '08:30', 'cpi'], ['2027-01-15', '08:30', 'retail']] };
+  const k = K.keyDates(Date.UTC(2026, 11, 15), 2, auto), at = d => k.dates.filter(x => x.date === d).map(x => x.kind);
+  assert.deepEqual(at('2027-01-13'), ['cpi']); assert.deepEqual(at('2027-01-08'), ['nfp']); assert.deepEqual(at('2027-01-27'), ['fomc']);
+  assert.ok(!k.dates.some(x => x.kind === 'retail'), 'seuls la Fed, l\'inflation et l\'emploi figurent parmi les dates clés');
+  assert.deepEqual(at('2027-01-15'), ['opex'], 'le 15 : échéance des options seulement');
+  assert.equal(k.officialUntil.cpi, '2027-01-13'); assert.equal(k.officialUntil.nfp, '2027-01-08');
+  const none = K.keyDates(Date.UTC(2026, 11, 15), 2, null);
+  assert.ok(!none.dates.some(x => x.date === '2027-01-13'), 'sans dates lues : liste saisie seulement (jusqu\'à fin 2026)');
+  assert.equal(K.keyDates(Date.UTC(2026, 9, 1), 1, auto).dates.filter(x => x.date === '2026-10-14').length, 1, 'pas de doublon avec la liste saisie');
+});

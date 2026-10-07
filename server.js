@@ -481,7 +481,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       await macroData('calendar').catch(() => {}); macroData('releases').catch(() => {});
       return send(res, 200, JSON.stringify(calendarData(key)));
     }
-    if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6)));
+    if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6, cache.macro.releases || null)));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');
       if (kind !== 'cpi' && kind !== 'rates') return send(res, 400, '{"error":"kind : cpi ou rates"}');
@@ -500,7 +500,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       for (const n of ['cpi', 'rates']) macroData(n).catch(() => {});                        // l'OCDE est lente et capricieuse : le debrief n'attend pas, il utilise ce qui est en cache
       const row = screener().rows.find(r => r.slug === m.slug);
       let inter = null;                                                           // intermarchés : indices uniquement
-      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = adjusted(mm).rows; } inter = { vol: volData(), keyDates: KEYDATES.keyDates(Date.now(), 2).dates, ...(INTER.profile(m, series, CALC.correlation) || {}), regime: intermarket().regime, ratios: ratiosData().ratios.map(({ series: _s, ...r }) => r) }; }
+      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = adjusted(mm).rows; } inter = { vol: volData(), keyDates: KEYDATES.keyDates(Date.now(), 2, cache.macro.releases || null).dates, ...(INTER.profile(m, series, CALC.correlation) || {}), regime: intermarket().regime, ratios: ratiosData().ratios.map(({ series: _s, ...r }) => r) }; }
       return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: adjusted(m).rows, inter })));
     }
     if (u.pathname.startsWith('/api/')) {

@@ -119,7 +119,7 @@ function renderKeyDates(data, root) {
    <div class="card"><div class="tw"><table class="cmp kd"><thead><tr><th scope="col">Date</th><th scope="col">Événement</th><th scope="col">Détail</th></tr></thead><tbody>
      ${list.map(d => `<tr class="kd-${d.kind}"><th scope="row">${fr(d.date)}</th><td>${cls(d.kind) ? `<span class="sig sm ${cls(d.kind)}">${d.label}</span>` : d.label}</td><td><small>${d.detail}</small></td></tr>`).join('')}
    </tbody></table></div>
-   <p class="note">Sources : calendriers officiels de la Fed (FOMC, publié jusqu'en ${until(data.officialUntil.fomc)}) et du Bureau of Labor Statistics (CPI et emploi, publiés jusqu'en ${until(data.officialUntil.cpi)}) ; échéances et roll des futures sur indices calculés par règle (3e vendredi du mois, roll 8 jours avant). Les résultats d'entreprises ne sont pas inclus.</p></div>`;
+   <p class="note">Sources : calendriers officiels de la Fed (FOMC, connu jusqu'en ${until(data.officialUntil.fomc)}) et du Bureau of Labor Statistics (CPI et emploi, connus jusqu'en ${until(data.officialUntil.cpi)}), relus chaque jour sur le site de la Fed et sur FRED ; échéances et roll des futures sur indices calculés par règle (3e vendredi du mois, roll 8 jours avant). Les résultats d'entreprises ne sont pas inclus.</p></div>`;
 }
 
 async function bootIntermarket() {

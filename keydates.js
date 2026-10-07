@@ -30,13 +30,18 @@ function expiration(y, m) {
 }
 
 // Dates clés entre `from` (ms) et `from + months` mois : [{ date, kind, label, detail }], triées.
-function keyDates(from = Date.now(), months = 6) {
+// auto : dates officielles lues chaque jour (releases.js → { fomc: [...], events: [[date, heure, type]] }) ; elles complètent les listes ci-dessus
+// et prennent le relais après leur dernière date connue.
+function keyDates(from = Date.now(), months = 6, auto = null) {
   const start = ymd(from), endT = new Date(from); endT.setUTCMonth(endT.getUTCMonth() + months); const end = ymd(+endT);
   const out = [];
   const add = (date, kind, label, detail) => { if (date >= start && date <= end) out.push({ date, kind, label, detail }); };
-  for (const f of FOMC) { const d = f.slice(0, 10), sep = f.endsWith('*'); add(d, 'fomc', 'Décision de la Fed (FOMC)', 'Décision à 14 h (heure de New York), conférence de presse à 14 h 30' + (sep ? ' ; avec projections économiques et « dot plot »' : '') + '.'); }
-  for (const d of CPI) add(d, 'cpi', 'Inflation américaine (CPI)', 'Publication à 8 h 30 (heure de New York).');
-  for (const d of NFP) add(d, 'nfp', 'Emploi américain (NFP)', 'Rapport sur l\'emploi, publication à 8 h 30 (heure de New York).');
+  const fomc = new Map(); for (const f of [...FOMC, ...((auto && auto.fomc) || [])]) { const d = f.slice(0, 10); fomc.set(d, fomc.get(d) || f.endsWith('*')); }
+  const fromAuto = kind => ((auto && auto.events) || []).filter(e => e[2] === kind).map(e => e[0]);
+  const cpi = [...new Set([...CPI, ...fromAuto('cpi')])].sort(), nfp = [...new Set([...NFP, ...fromAuto('nfp')])].sort();
+  for (const [d, sep] of fomc) { add(d, 'fomc', 'Décision de la Fed (FOMC)', 'Décision à 14 h (heure de New York), conférence de presse à 14 h 30' + (sep ? ' ; avec projections économiques et « dot plot »' : '') + '.'); }
+  for (const d of cpi) add(d, 'cpi', 'Inflation américaine (CPI)', 'Publication à 8 h 30 (heure de New York).');
+  for (const d of nfp) add(d, 'nfp', 'Emploi américain (NFP)', 'Rapport sur l\'emploi, publication à 8 h 30 (heure de New York).');
   const y0 = new Date(from).getUTCFullYear();
   for (let y = y0; y <= y0 + 1; y++) for (let m = 0; m < 12; m++) {
     const t = expiration(y, m);
@@ -46,7 +51,9 @@ function keyDates(from = Date.now(), months = 6) {
       add(ymd(roll), 'roll', 'Roll des futures sur indices', 'Le volume passe au contrat suivant : à partir de cette date, le contrat de référence change (ES, NQ, YM, RTY).');
     } else add(ymd(t), 'opex', 'Échéance mensuelle des options', 'Expiration des options mensuelles sur indices et actions.');
   }
-  return { from: start, to: end, officialUntil: OFFICIAL_UNTIL, dates: out.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind)) };
+  const last = (list, fallback) => [fallback, ...list].sort().at(-1);
+  const officialUntil = { fomc: last([...fomc.keys()], OFFICIAL_UNTIL.fomc), cpi: last(cpi, OFFICIAL_UNTIL.cpi), nfp: last(nfp, OFFICIAL_UNTIL.nfp) };
+  return { from: start, to: end, officialUntil, dates: out.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind)) };
 }
 
 module.exports = { FOMC, CPI, NFP, OFFICIAL_UNTIL, goodFriday, expiration, keyDates };
