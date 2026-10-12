@@ -341,3 +341,6 @@ table.react-t td,table.react-t th{white-space:nowrap}table.react-t td{font-varia
 .cal-warn{border-left:4px solid var(--gold)}.cal-warn .sec{margin-top:0}.cal-warn p{margin:6px 0 0;line-height:1.55}
 /* calendrier : fiabilité mesurée affichée sous l'étiquette (pastille verte, rouge ou ambre) */
 .cal-acc{margin:4px 0 6px;font-size:.78rem;line-height:1.45;color:var(--muted);max-width:44ch}.cal-acc b{color:var(--text)}
+/* fiabilité mesurée de la confluence (screener et fiche marché) */
+.cf-acc{display:inline-block;margin-top:3px;font-size:.74rem;line-height:1.35;color:var(--muted);font-variant-numeric:tabular-nums;cursor:help}.cf-acc span{opacity:.85}
+.cf-acc2{margin-top:10px;line-height:1.55}.cf-acc2 b{color:var(--text)}

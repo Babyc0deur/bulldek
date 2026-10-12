@@ -39,17 +39,34 @@
         <td class="${s.avgPct == null ? '' : s.avgPct >= 0 ? 'pos' : 'neg'}">${s.avgPct == null ? '–' : (s.avgPct > 0 ? '+' : '') + s.avgPct.toFixed(2) + ' %'} <small>${s.up}/${s.n} hausse</small>${dayCell(r.seasonDay)}</td>
         <td class="${r.oi && r.oi.chgPct >= 0 ? 'pos' : 'neg'}">${r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' % ' + pill(r.oi.label, r.sig.oi > 0 ? 'buy' : r.sig.oi < 0 ? 'sell' : 'wait') : '–'}</td>
         <td>${r.wr.toFixed(1)} ${r.roll ? pill('Non fiable', 'wait') + WARN : r.wrZone && !r.sig.wr ? `<span title="Contre la tendance : prix ${r.trend && r.trend.up ? 'au-dessus' : 'au-dessous'} de sa moyenne 200 séances, signal ignoré">${pill(z[0] + ' · contre-tendance', 'wait')}</span>` : pill(z[0], z[1])}${r.trend ? ` <small class="tr ${r.trend.up ? 'pos' : 'neg'}" title="Prix ${r.trend.up ? 'au-dessus' : 'au-dessous'} de sa moyenne 200 séances (${(r.trend.pct > 0 ? '+' : '') + r.trend.pct.toFixed(1)} %)">${r.trend.up ? '▲' : '▼'}</small>` : ''}</td>
-        <td class="cf">${dot(r.sig.cot, 'COT')}${dot(r.sig.season, 'Saison')}${dot(r.sig.wr, 'Williams %R')}${dot(r.sig.oi, 'Open interest')} ${pill((r.score > 0 ? '+' : '') + r.score, cls)}</td></tr>`;
+        <td class="cf">${dot(r.sig.cot, 'COT')}${dot(r.sig.season, 'Saison')}${dot(r.sig.wr, 'Williams %R')}${dot(r.sig.oi, 'Open interest')} ${pill((r.score > 0 ? '+' : '') + r.score, cls)}${accText(r) ? '<br>' + accText(r) : ''}</td></tr>`;
     }).join('');
     $('#tbl').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || '<tr><td colspan="8">Aucun marché ne correspond.</td></tr>'}</tbody>`;
     const miss = rows.filter(r => r.missing).length, old = $('#miss');
     if (old) old.remove();
     if (miss) $('.scr-wrap').insertAdjacentHTML('afterend', `<p class="note tight" id="miss">${miss} marché(s) en cours de chargement côté serveur, réessayez dans une minute.</p>`);
   }
+  // Fiabilité mesurée de la confluence (rejeu sans regarder le futur, calculé par le serveur) : chargée après l'affichage, sans bloquer la page.
+  // Sous la pastille : quand la confluence était à ce niveau, part des semaines où le marché a ensuite monté (haussière) ou baissé (baissière) 5 séances plus tard, avec la référence.
+  let chk = null;
+  const accText = r => {
+    const c = chk && chk.markets && chk.markets[r.slug], th = CALC.THRESHOLDS.confluenceStrong, bull = r.score >= th, bear = r.score <= -th;
+    if (!c || (!bull && !bear)) return '';
+    const g = bull ? c.bull : c.bear;
+    if (!g || g.n < (chk.minWeeks || 30)) return '<small class="cf-acc" title="Trop peu de semaines passées avec ce niveau de confluence pour mesurer sa fiabilité sur ce marché.">fiabilité : trop peu de cas</small>';
+    const own = bull ? g.up : g.down, base = bull ? c.base.up : c.base.down, p = v => String(v).replace('.', ',');
+    return `<small class="cf-acc" title="Rejeu sans regarder le futur depuis ${c.from.slice(0, 4)} : ${g.n} semaines avec une confluence ${bull ? '≥ +2' : '≤ −2'}. ${chk.horizon} séances plus tard, le marché avait ${bull ? 'monté' : 'baissé'} dans ${p(own)} % des cas (toutes les semaines : ${p(base)} %).">${bull ? 'a monté' : 'a baissé'} ${p(own)} % <span>(toutes semaines : ${p(base)} %)</span></small>`;
+  };
   $('#tbl').onclick = e => {
     const tr = e.target.closest('tr[data-href]');
     if (tr && !e.target.closest('a')) { location.href = tr.dataset.href; return; }
     const th = e.target.closest('th.s'); if (!th) return; const k = th.dataset.k; dir = k === sk ? -dir : (k === 'name' ? 1 : -1); sk = k; paint(); };
   ['#q', '#grp', '#bias'].forEach(s => $(s).addEventListener('input', paint));
   paint();
+  (async () => {
+    for (let i = 0; i < 90; i++) {                                              // calcul à la demande côté serveur : on redemande toutes les 2 s pendant au plus 3 minutes
+      try { const d = await (await fetch('/api/confluence-check')).json(); if (d && d.markets) { chk = d; paint(); return; } if (!d || !d.loading) return; } catch { return; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  })();
 })();

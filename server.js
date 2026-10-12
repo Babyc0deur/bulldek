@@ -20,7 +20,7 @@ const STATIC = {
 const SCRIPTS = new Set(['calendarview.js', 'intermarketview.js', 'macroview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./cotsource.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), EVENTSTATS = require('./eventstats.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./cotsource.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), EVENTSTATS = require('./eventstats.js'), CONFCHECK = require('./confluencecheck.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -447,6 +447,39 @@ function calendarData(key, now = Date.now(), week = null) {
   return val;
 }
 
+// ---- Fiabilité mesurée de la confluence (confluencecheck.js) : rejeu semaine par semaine, sans regarder le futur ----
+// Le calcul complet prend environ 1,5 s en local mais jusqu'à 25 s sur un petit serveur (Render) : la requête n'attend pas la fin du calcul. Il n'est lancé qu'à la
+// demande (visite du screener ou d'une fiche), un marché à la fois en rendant la main entre deux marchés ; pendant ce temps l'API répond « en cours » avec l'avancement.
+let ccMemo = { at: 0, stamp: '', val: null }, ccJob = null, ccProgress = { done: 0, total: 0 };
+const ccStamp = () => MARKETS.map(m => (cache.ts.daily[m.code] || 0) + ':' + (cache.ts.cot[m.code] || 0) + ':' + (cache.ts.cash[m.code] || 0)).join(',');
+const ccFresh = () => ccMemo.val && ccMemo.stamp === ccStamp() && Date.now() - ccMemo.at < 12 * 3600e3;
+function confluenceCheckRefresh() {
+  if (ccJob) return ccJob;
+  if (ccFresh()) return Promise.resolve();
+  ccJob = (async () => {
+    const stamp = ccStamp(), t0 = Date.now(), markets = {};
+    ccProgress = { done: 0, total: MARKETS.length };
+    for (const m of MARKETS) {
+      await new Promise(r => setImmediate(r));
+      const raw = cache.daily[m.code], cot = cache.cot[m.code];
+      if (raw && cot) {
+        const res = CONFCHECK.summarize(CONFCHECK.samples({ rows: adjusted(m).rows, raw, legacyHist: cot.hist, tffHist: cache.tff[m.code] && cache.tff[m.code].hist,
+          cotSource: COT_SOURCE[m.slug] && cache.tff[m.code] ? COT_SOURCE[m.slug] : 'legacy', seasonCap: SEASON_CAPS[m.slug] || SEASON_YEARS, crypto: m.group === 'Crypto' }));
+        if (res) markets[m.slug] = res;
+      }
+      ccProgress.done++;
+    }
+    ccMemo = { at: Date.now(), stamp, val: { updated: Date.now(), horizon: CONFCHECK.HORIZON, minWeeks: CONFCHECK.MIN_WEEKS, markets } };
+    logV('fiabilité de la confluence : ' + Object.keys(markets).length + ' marchés rejoués (à la demande) en ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
+  })().catch(e => log('fiabilité de la confluence : échec du calcul :', e.message)).finally(() => { ccJob = null; });
+  return ccJob;
+}
+function confluenceCheckData() {
+  if (ccFresh()) return ccMemo.val;
+  confluenceCheckRefresh();
+  return ccMemo.val ? { ...ccMemo.val, refreshing: true } : { loading: true, progress: ccProgress };
+}
+
 // ---- Protections : en-têtes de sécurité, limite de débit, validation des requêtes ----
 // CSP stricte : ni script ni style en ligne, aucune ressource tierce.
 const SECURITY_HEADERS = {
@@ -511,6 +544,7 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
       await macroData('calendar').catch(() => {}); macroData('releases').catch(() => {});
       return send(res, 200, JSON.stringify(calendarData(key)));
     }
+    if (u.pathname === '/api/confluence-check') return send(res, 200, JSON.stringify(confluenceCheckData()));
     if (u.pathname === '/api/keydates') return send(res, 200, JSON.stringify(KEYDATES.keyDates(Date.now(), 6, cache.macro.releases || null)));
     if (u.pathname === '/api/macro') {                                          // inflation ou taux : ?kind=cpi | rates
       const kind = u.searchParams.get('kind');

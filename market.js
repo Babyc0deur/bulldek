@@ -17,7 +17,27 @@ async function renderConfluence(m) {
         ${item('#sOi', r.sig.oi, 'Open interest · semaine', r.oi ? (r.oi.chgPct > 0 ? '+' : '') + r.oi.chgPct.toFixed(2) + ' %' : '–', r.oi ? r.oi.label + ' · ' + (r.roll ? 'neutralisé (changement de contrat)' : 'Signal ' + txt(r.sig.oi)) : 'Indisponible')}
       </div>
       <p class="confl-note">Repère pédagogique, pas un conseil en investissement. <a href="/screener">Voir tous les marchés →</a></p>`;
+    fillConfluenceAccuracy(m.slug, r, box);
   } catch { /* panneau facultatif */ }
+}
+// Fiabilité mesurée de la confluence sur ce marché (rejeu sans regarder le futur, calculé par le serveur) : ajoutée sous le panneau dès qu'elle est prête.
+async function fillConfluenceAccuracy(slug, r, box) {
+  const th = CALC.THRESHOLDS.confluenceStrong, p = v => String(v).replace('.', ',');
+  for (let i = 0; i < 90; i++) {
+    let d; try { d = await (await fetch('/api/confluence-check')).json(); } catch { return; }
+    if (d && d.markets) {
+      const c = d.markets[slug]; if (!c) return;
+      const min = d.minWeeks || 30, ok = g => g && g.n >= min, eb = ok(c.bull) ? c.bull.up - c.base.up : null, ed = ok(c.bear) ? c.bear.down - c.base.down : null;
+      const part = (g, own, base, label, verb) => ok(g) ? `${label} : ${verb} dans <b>${p(own)} %</b> des cas (${g.n} semaines ; toutes les semaines : ${p(base)} %)` : `${label} : trop peu de semaines pour mesurer (${g ? g.n : 0})`;
+      const notes = [];
+      if (ok(c.bear) && c.bear.down < c.base.down) notes.push('les semaines baissières ont baissé moins souvent que la moyenne des semaines');
+      if ((eb == null || eb < 5) && (ed == null || ed < 5) && (eb != null || ed != null)) notes.push('l\'écart avec la moyenne reste faible : ce score dit peu de choses sur la semaine à venir');
+      box.innerHTML += `<p class="confl-note cf-acc2"><b>Fiabilité mesurée sur ce marché</b> (rejeu sans regarder le futur, ${c.from.slice(0, 4)}-${c.to.slice(0, 4)}, ${c.weeks} semaines, résultat ${d.horizon} séances plus tard) : ${part(c.bull, c.bull.up, c.base.up, 'confluence haussière (≥ +2)', 'marché plus haut')} · ${part(c.bear, c.bear.down, c.base.down, 'confluence baissière (≤ −2)', 'marché plus bas')}.${notes.length ? ' ' + notes.map(n => 'À retenir : ' + n + '.').join(' ') : ''}</p>`;
+      return;
+    }
+    if (!d || !d.loading) return;
+    await new Promise(r => setTimeout(r, 2000));
+  }
 }
 (async () => {
   let m;

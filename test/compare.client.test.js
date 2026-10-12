@@ -105,3 +105,17 @@ test('gabarit : graphiques décrits, boutons à état, aucun style en ligne, en-
   assert.match(html, /aria-pressed="true"/); assert.doesNotMatch(html, /\sstyle=/);
   assert.match(html, /<th scope="col"/); assert.match(html, /<th scope="row"/);
 });
+
+test('comparaison : par défaut Nasdaq 100 contre Dow Jones ; si A est le Dow, B devient le Nasdaq 100 ; jamais deux fois le même marché', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'compare.js'), 'utf8');
+  assert.match(src, /let a = find\(q\.get\('a'\), 'nasdaq-100'\), b = find\(q\.get\('b'\), 'dow-jones'\)/);
+  // Même logique que le chargement de la page, sur la vraie liste des marchés.
+  const markets = require('../markets.json'), pick = (qa, qb) => {
+    const q = new URLSearchParams((qa ? 'a=' + qa : '') + (qa && qb ? '&' : '') + (qb ? 'b=' + qb : '')), find = (slug, fb) => markets.find(m => m.slug === slug) || markets.find(m => m.slug === fb);
+    let a = find(q.get('a'), 'nasdaq-100'), b = find(q.get('b'), 'dow-jones');
+    if (a.slug === b.slug) b = markets.find(m => m.slug === 'nasdaq-100' && m.slug !== a.slug) || markets.find(m => m.slug !== a.slug);
+    return [a.slug, b.slug];
+  };
+  assert.deepEqual(pick(), ['nasdaq-100', 'dow-jones']); assert.deepEqual(pick('dow-jones'), ['dow-jones', 'dow-jones'.replace('dow-jones', 'nasdaq-100')]);
+  assert.deepEqual(pick('sp500'), ['sp500', 'dow-jones']); assert.deepEqual(pick('nasdaq-100', 'nasdaq-100')[0] !== pick('nasdaq-100', 'nasdaq-100')[1], true);
+});

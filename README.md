@@ -52,6 +52,7 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `/api/intermarket` | Corrélations croisées calculées sur les séances quotidiennes en cache (mémorisées 5 min, aucun appel externe) |
 | `/api/yields` | Rendements, courbe, taux réel, VIX et VIX 3 mois (FRED) |
 | `/api/calendrier?m=AAAA-MM` ou `?w=AAAA-MM-JJ` | Données du calendrier d'un mois ou d'une semaine commençant un lundi (période proposée dans `months`) |
+| `/api/confluence-check` | Fiabilité mesurée de la confluence par marché (rejeu sans regarder le futur, calculé à la demande ; répond `{loading, progress}` tant qu'il n'est pas prêt) |
 | `/api/volatility`, `/api/keydates` | Volatilité des actions (VIX, structure, volatilité réalisée) ; dates clés des 6 prochains mois (FOMC, CPI, emploi, échéances et roll) |
 | `/api/screener`, `/api/status[?code=…]`, `/health` | Synthèse, fraîcheur, sonde de supervision |
 

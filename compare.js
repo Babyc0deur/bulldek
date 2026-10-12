@@ -96,8 +96,8 @@ async function bootCompare() {
   const B = BD, $ = s => document.querySelector(s);
   const markets = await B.json('/markets.json'), q = new URLSearchParams(location.search);
   const find = (slug, fb) => markets.find(m => m.slug === slug) || markets.find(m => m.slug === fb);
-  let a = find(q.get('a'), 'nasdaq-100'), b = find(q.get('b'), 'sp500');
-  if (a.slug === b.slug) b = markets.find(m => m.slug !== a.slug);
+  let a = find(q.get('a'), 'nasdaq-100'), b = find(q.get('b'), 'dow-jones');                   // par défaut : Nasdaq 100 contre Dow Jones
+  if (a.slug === b.slug) b = markets.find(m => m.slug === 'nasdaq-100' && m.slug !== a.slug) || markets.find(m => m.slug !== a.slug);
   const GROUPS = ['Currencies', 'Crypto', 'Indices', 'Bonds', 'Energy', 'Metals', 'Grains', 'Softs', 'Livestock'];
   const options = sel => GROUPS.map(g => `<optgroup label="${g}">` + markets.filter(x => x.group === g).map(x => `<option value="${x.slug}" ${x.slug === sel ? 'selected' : ''}>${x.name}</option>`).join('') + '</optgroup>').join('');
   const sync = () => {
