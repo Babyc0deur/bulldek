@@ -15,10 +15,10 @@ async function run() {
   const { rec, el, root } = await render({ src: path.join(ROOT, 'seasonal.js'), fnName: 'renderSeasonal', args: M, now: NOW, calc: CALC,
     overrides: { json: async url => { urls.push(url); return { updated: 1, report }; } } });
   const snap = () => ({ monthly: parseTable(el('#tbl').innerHTML), weekly: parseTable(el('#wtbl').innerHTML), daily: parseTable(el('#dtbl').innerHTML) });
-  const pts = snap(), bars = { pts: { month: rec.bars['#cMBars'].map(b => b.v), day: rec.bars['#cDay'].map(b => b.v) } };
-  el('#unit').onclick({ target: { closest: () => ({ dataset: { u: 'pct' } }) } });                  // clic sur « % »
-  const pct = snap(); bars.pct = { month: rec.bars['#cMBars'].map(b => b.v), day: rec.bars['#cDay'].map(b => b.v) };
-  return { rec, el, root, pts, pct, bars, urls };
+  const defaultHtml = root.innerHTML, pct = snap(), bars = { pct: { month: rec.bars['#cMBars'].map(b => b.v), day: rec.bars['#cDay'].map(b => b.v) } };   // affichage par défaut : en %
+  el('#unit').onclick({ target: { closest: () => ({ dataset: { u: 'pts' } }) } });                  // clic sur « Points »
+  const pts = snap(); bars.pts = { month: rec.bars['#cMBars'].map(b => b.v), day: rec.bars['#cDay'].map(b => b.v) };
+  return { rec, el, root, pts, pct, bars, urls, defaultHtml };
 }
 const close = (a, b, tol, msg) => assert.ok(a == null || b == null ? a === b : Math.abs(a - b) <= tol + 1e-9, `${msg} : ${a} ≠ ${b}`);
 const TOL = { pts: 0.1, pct: 0.01 };                                                                // une unité d'affichage (1 décimale en points, 2 en %)
@@ -72,4 +72,9 @@ test('accessibilité du gabarit : graphiques décrits, boutons à état, en-têt
   canvases.forEach(c => { assert.match(c, /role="img"/); assert.match(c, /aria-label="[^"]{40,}"/); assert.ok(c.includes(M.name), 'la description doit nommer le marché : ' + c.slice(0, 80)); });
   assert.match(html, /aria-pressed="true"/); assert.match(html, /role="group"/);
   assert.doesNotMatch(html, /\sstyle=/, 'aucun attribut style en ligne (CSP)');
+});
+
+test('variations affichées en % par défaut (bouton « % » actif), « Points » disponible', async () => {
+  const { defaultHtml } = await run();
+  assert.match(defaultHtml, /data-u="pct" aria-pressed="true">%/); assert.match(defaultHtml, /data-u="pts" aria-pressed="false">Points/);
 });

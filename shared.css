@@ -331,10 +331,8 @@ span.ev-high{color:var(--redl)}span.ev-medium{color:var(--gold)}span.ev-low{colo
 .cal-day.cal-off{opacity:.55}.cal-day.cal-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 @media (max-width:1100px){.cal-week{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:700px){.cal-week{grid-template-columns:1fr}.cal-title{min-width:0;font-size:1.05rem}}
-/* amplitude moyenne du jour (fiche marché) */
-.atr-box{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.atr-head small{color:var(--muted);margin-left:6px}
-.atr-kpi{display:flex;flex-wrap:wrap;gap:6px 18px;margin:6px 0 8px;color:var(--muted)}.atr-kpi b{color:var(--text)}
-table.atr-t{max-width:520px}table.atr-t td{font-variant-numeric:tabular-nums}
+/* amplitude moyenne du jour (calendrier) */
+table.atr-t td{font-variant-numeric:tabular-nums}table.atr-t td small{color:var(--muted)}
 /* réaction historique aux annonces (calendrier) */
 .ev-r{display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;font-size:.75rem;color:var(--muted);border:1px solid var(--line);white-space:nowrap;cursor:help}
 table.react-t td,table.react-t th{white-space:nowrap}table.react-t td{font-variant-numeric:tabular-nums}

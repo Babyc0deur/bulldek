@@ -372,7 +372,7 @@ function screener() {
     // Open interest : lecture de la dernière semaine (prix du mardi contre open interest). Un changement de contrat récent fausse la variation de prix : signal neutralisé.
     const oiw = CALC.oiWeek(cot.hist, d);
     const sig = { cot: REL.cotSig(src, idx6), season: CALC.seasonSignal(season), wr: roll ? 0 : CALC.wrTrendSignal(w, A.at(-1)[1], ma), oi: roll || !oiw ? 0 : CALC.oiSignal(oiw.reading) };
-    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cl.date, netC: net.at(-1), cotSource: src, cotLabel: REL.COT_SOURCES[src].label, tffIdx, trend, wrZone: CALC.wrSignal(w), atr: CALC.atr(A, 14),
+    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cl.date, netC: net.at(-1), cotSource: src, cotLabel: REL.COT_SOURCES[src].label, tffIdx, trend, wrZone: CALC.wrSignal(w),
       idx6, idx36, wr: w, roll, season, seasonDay, sig, score: sig.cot + sig.season + sig.wr + sig.oi,
       oi: oiw ? { last: oiw.last, chgPct: oiw.chgPct, priceChgPct: oiw.priceChgPct, key: oiw.reading.key, label: oiw.reading.label } : null };
   });
@@ -441,7 +441,7 @@ function calendarData(key, now = Date.now(), week = null) {
   if (hit && hit.stamp === stamp) return hit.val;
   const opts = { series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], auto: cache.macro.releases || null, today };
   const months = calendarMonths(now), monday = MONTHCAL.nyDate(Date.parse(today + 'T12:00:00Z') - ((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7) * 864e5);
-  const val = { months, today, thisWeek: monday, reactions: reactionsData(series), accuracy: accuracyData(series), ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
+  const val = { months, today, thisWeek: monday, reactions: reactionsData(series), accuracy: accuracyData(series), atr: Object.fromEntries(Object.entries(series).map(([k, rows]) => [k, { ...CALC.atr(rows, 14), stops: CALC.atrStops(rows, 14) }])), ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
   if (calMemo.size > 60) calMemo.clear();
   calMemo.set(id, { stamp, val });
   return val;

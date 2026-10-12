@@ -40,7 +40,7 @@ async function renderSeasonal(m, root) {
    </div>
 
    <div class="sechead"><h2 class="sec">Variations mensuelles</h2>
-     <div class="ranges" id="unit" role="group" aria-label="Unité"><button class="btn on" data-u="pts" aria-pressed="true">Points</button><button class="btn" data-u="pct" aria-pressed="false">%</button></div></div>
+     <div class="ranges" id="unit" role="group" aria-label="Unité"><button class="btn" data-u="pts" aria-pressed="false">Points</button><button class="btn on" data-u="pct" aria-pressed="true">%</button></div></div>
    <div class="g21">
      <div class="card"><div class="tw"><table class="mon" id="tbl"></table></div></div>
      <div class="card"><h3>Variation moyenne par mois – 10 ans</h3><canvas id="cMBars" role="img" aria-label="Variation moyenne du ${m.name} pour chacun des 12 mois, sur 10 ans. Valeurs dans le tableau voisin."></canvas></div>
@@ -96,7 +96,7 @@ async function renderSeasonal(m, root) {
     + kp('Ce mois-ci', S.kpi.monthSoFar == null ? '–' : fmt(S.kpi.monthSoFar), cls(S.kpi.monthSoFar)) + kp(`Hausse en ${mname} (10 a.)`, `${S.kpi.up}/${S.kpi.n}`);
 
   // ---- tableaux ----
-  let unit = 'pts';
+  let unit = 'pct';                                  // variations affichées en % par défaut (le bouton « Points » reste disponible)
   const f2 = v => v == null ? '–' : unit === 'pct' ? B.dec(v, 2) + '%' : fmt(v);
   const bars = (canvas, arr, labels, h) => B.bars(canvas, arr.map((v, i) => ({ label: labels[i], v: v || 0, color: (v || 0) >= 0 ? K.greenl : K.redl })), h, false);
 

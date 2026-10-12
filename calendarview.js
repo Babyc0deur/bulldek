@@ -81,6 +81,20 @@ function renderCalendar(data, root, nav = () => {}) {
       <p class="note">Séance du jour de l'annonce (clôture contre clôture précédente), sur les futures ajustés des changements de contrat. Mouvement moyen : variation moyenne en valeur absolue, quel que soit le sens. Amplitude : plus haut moins plus bas de la séance, en % du prix. « vs séance ordinaire » : amplitude du jour d'annonce rapportée à celle des autres séances de la même période (×1,3 = 30 % plus agitée). La décision de la Fed tombe à 14 h : la séance entière n'en dépend pas. Le repère « ES ±… · ampl. ×… » à côté de chaque annonce reprend ces chiffres pour le S&P 500 ; survolez-le pour les trois indices.</p></div>`;
   }
 
+  // Amplitude moyenne du jour (ATR 14 séances) : en points, en % du prix et en dollars par contrat (standard et micro), avec les stops réellement touchés (mesurés par le serveur).
+  const POINT = { ES: [['ES', 50], ['MES', 5]], NQ: [['NQ', 20], ['MNQ', 2]], YM: [['YM', 5], ['MYM', 0.5]] }, NAME = { ES: 'S&P 500', NQ: 'Nasdaq 100', YM: 'Dow Jones' };
+  const usd = v => v.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' $', pts = v => v.toLocaleString('fr-FR', { maximumFractionDigits: v < 100 ? 2 : 1 });
+  function atrCard() {
+    const T = data.atr || {}, tags = ['ES', 'NQ', 'YM'].filter(t => T[t] && T[t].value);
+    if (!tags.length) return '';
+    const rows = tags.flatMap(t => POINT[t].map(([c, pv], i) => { const a = T[t], s = a.stops;
+      return `<tr><th scope="row">${c}${i === 0 ? `<br><small>${NAME[t]}</small>` : ''}</th><td>${pts(a.value)} pts<br><small>${a.pct.toFixed(2).replace('.', ',')} % du prix</small></td><td>${usd(a.value * pv)}</td><td>${usd(a.value * pv / 2)}</td><td>${usd(a.last * pv)}<br><small>×${a.lastRatio.toFixed(1).replace('.', ',')} l'ATR</small></td>${s ? `<td>${p1(s.half.long)} / ${p1(s.half.short)}</td><td>${p1(s.full.long)} / ${p1(s.full.short)}</td>` : '<td>–</td><td>–</td>'}</tr>`; }));
+    return `<div class="card"><h2 class="sec">Amplitude moyenne du jour (ATR ${T[tags[0]].n} séances)</h2><div class="tw"><table class="cmp atr-t">
+      <thead><tr><th scope="col">Contrat</th><th scope="col">ATR</th><th scope="col">1 ATR</th><th scope="col">½ ATR</th><th scope="col">Dernière séance</th><th scope="col">Stop à ½ ATR touché (long / court)</th><th scope="col">Stop à 1 ATR touché (long / court)</th></tr></thead>
+      <tbody>${rows.join('')}</tbody></table></div>
+      <p class="note">ATR : amplitude moyenne d'une séance (plus haut moins plus bas, écarts d'ouverture compris, lissage de Wilder), sur les futures ajustés des changements de contrat. Valeur d'un point : ES 50 $, MES 5 $, NQ 20 $, MNQ 2 $, YM 5 $, MYM 0,5 $ (spécifications CME, à vérifier auprès de votre courtier). Les deux dernières colonnes sont mesurées sur tout l'historique : part des séances où le plus bas (stop long) ou le plus haut (stop court) a atteint ½ ATR ou 1 ATR de la clôture précédente. L'ATR décrit l'agitation, pas la direction.</p></div>`;
+  }
+
   root.innerHTML = `
    <div class="cal-nav" role="toolbar" aria-label="Navigation du calendrier">
      <div class="cal-move">
@@ -100,6 +114,7 @@ function renderCalendar(data, root, nav = () => {}) {
    ${points.length ? `<div class="card"><h2 class="sec">${week ? 'Cette semaine-là' : 'En ' + data.label}</h2><ul class="rl-notes">${points.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
    ${body}
    ${reactTable()}
+   ${atrCard()}
    <p class="note">Saisonnalité : variation de la séance (clôture contre clôture précédente) pour ce jour du mois, sur les ${calPeriod} dernières années complètes où le marché a coté ce jour-là. « 9/15 en hausse » : 9 années sur 15 ont monté. Survolez une case pour voir aussi les périodes de 15 et 25 ans. Couleur des annonces : <span class="ev-high">rouge</span> forte importance, <span class="ev-medium">ambre</span> moyenne, <span class="ev-low">gris</span> faible. Dates officielles connues jusqu'au ${new Date(data.officialUntil + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}.</p>`;
 
   $('#calP').onclick = e => { const b = e.target.closest('button'); if (!b || +b.dataset.p === calPeriod) return; calPeriod = +b.dataset.p; renderCalendar(data, root, nav); };

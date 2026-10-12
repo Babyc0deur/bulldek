@@ -87,6 +87,23 @@
     const last = tr(rows.length - 1), close = rows[rows.length - 1][1];
     return { value: a, pct: a / close * 100, last, lastRatio: a ? last / a : null, n };
   }
+  // Stops touchés : pour chaque séance, ATR (Wilder, n séances) connu à la veille ; un stop long placé à k × ATR sous la clôture précédente est touché si le plus bas
+  // descend jusque-là, un stop court à k × ATR au-dessus si le plus haut monte jusque-là. Renvoie la part des séances (en %) pour k = ½ et 1, côté long et côté court,
+  // et pour les deux côtés la même séance. rows = [[t, clôture, haut, bas]].
+  function atrStops(rows, n = 14) {
+    if (!rows || rows.length < n + 2) return null;
+    const tr = i => Math.max(rows[i][2] - rows[i][3], Math.abs(rows[i][2] - rows[i - 1][1]), Math.abs(rows[i][3] - rows[i - 1][1]));
+    let a = 0; for (let i = 1; i <= n; i++) a += tr(i); a /= n;
+    let sessions = 0; const c = { hl: 0, hs: 0, fl: 0, fs: 0, both: 0 };
+    for (let i = n + 1; i < rows.length; i++) {
+      const advL = rows[i - 1][1] - rows[i][3], advS = rows[i][2] - rows[i - 1][1]; sessions++;
+      const hl = advL >= 0.5 * a, hs = advS >= 0.5 * a;
+      if (hl) c.hl++; if (hs) c.hs++; if (advL >= a) c.fl++; if (advS >= a) c.fs++; if (hl && hs) c.both++;
+      a = (a * (n - 1) + tr(i)) / n;
+    }
+    const p = k => Math.round(k / sessions * 1000) / 10;
+    return { sessions, half: { long: p(c.hl), short: p(c.hs), both: p(c.both) }, full: { long: p(c.fl), short: p(c.fs) } };
+  }
   // Moyenne mobile simple des clôtures (colonne 1) sur n séances, alignée sur rows : null tant qu'il n'y a pas n séances.
   function sma(rows, n = THRESHOLDS.trendSma) {
     const out = new Array(rows.length).fill(null); let s = 0;
@@ -318,6 +335,6 @@
     return { ...sum, priceChgPct, reading: oiReading(priceChgPct, sum.chgPct) };
   }
 
-  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, wrTrendSignal, sma, atr, seasonSignal, cotLabel,
+  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, wrTrendSignal, sma, atr, atrStops, seasonSignal, cotLabel,
     usFederalHolidays, cotReleaseDate, etInstant, nextCotRelease, alignByDay, alignedReturns, correlation, rollingCorrelation, rebase, performance };
 });
