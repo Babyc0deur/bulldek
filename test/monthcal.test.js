@@ -103,12 +103,13 @@ test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif, jo
   // Faits sur la période choisie (20 ans par défaut) : moyenne, médiane, années en hausse, pour chaque indice.
   assert.match(text, /ES moy\. \+0,12 % · méd\. −0,05 % · 9\/14 en hausse/); assert.match(text, /NQ moy\. −0,10 % · méd\. \+0,10 % · 10\/14 en hausse/); assert.match(text, /YM moy\. \+0,30 % · méd\. \+0,20 % · 8\/12 en hausse/);
   assert.match(h, /data-p="20" aria-pressed="true">20 ans/); assert.match(h, /title="15 ans : ES moy\. \+0,12 %, méd\. −0,05 %, 9\/15 en hausse/);
-  // Étiquettes indicatives, avec leur fiabilité mesurée juste dessous (valeurs venues du serveur), jamais en vert ni en rouge.
-  assert.match(h, /<span class="cal-lab">Neutre<\/span>/); assert.match(h, /<span class="cal-lab">Baissier fort<\/span> <small title="[^"]*">irrégulier<\/small>/);
+  // Étiquettes indicatives (vert, rouge ou ambre), avec leur fiabilité mesurée juste dessous (valeurs venues du serveur).
+  assert.match(h, /<span class="sig sm wait">Neutre<\/span>/); assert.match(h, /<span class="sig sm sell">Baissier fort<\/span> <small title="[^"]*">irrégulier<\/small>/);
   assert.match(text, /Pas de lecture : le S&P 500 monte 55,8 % de ces jours \(tous les jours : 54,6 %\)/);
   assert.match(text, /S&P 500 : a baissé 48,2 % des jours ainsi étiquetés \(tous les jours : 44,7 %\) · 274 jours/);
   assert.match(h, /title="ES : monte 51,1 %, baisse 48,2 % \(tous les jours : monte 54,6 %, baisse 44,7 %\) · NQ : monte 50,7 %/);
-  assert.doesNotMatch(h, /class="sig sm (buy|sell)"|↑|↓/, 'jamais de pastille verte ou rouge, ni de flèche de sens');
+  assert.doesNotMatch(h, /↑|↓/, 'pas de flèche de sens');
+  assert.match(h, /sig sm sell">Baissier fort[\s\S]*?a baissé <b>48,2 %/, 'la pastille rouge est toujours suivie de sa fiabilité mesurée');
   // Avertissement en tête : chiffres mesurés, et phrase exacte (les jours « baissier fort » ont monté plus d'une fois sur deux).
   assert.match(text, /Ces étiquettes sont indicatives, pas des signaux/); assert.match(text, /pas ce qu'ils feront/);
   assert.match(text, /3 521 jours \(2012-2025\), le S&P 500 a monté .*?des jours « haussier fort », 51,1 % des jours « baissier fort » \(donc plus d'une fois sur deux\) et 54,6 % de l'ensemble des jours : l'étiquette ne dit presque rien du sens du jour/);

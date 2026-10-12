@@ -50,7 +50,8 @@ function renderCalendar(data, root, nav = () => {}) {
         : `Pas de lecture : le S&P 500 monte ${p1(acc.ES.up)} de ces jours (tous les jours : ${p1(all.ES.up)})`;
       detail = ['ES', 'NQ', 'YM'].map(t => `${t} : monte ${p1(acc[t].up)}, baisse ${p1(acc[t].down)} (tous les jours : monte ${p1(all[t].up)}, baisse ${p1(all[t].down)})`).join(' · ') + ` — mesuré de ${A.from} à ${A.to}, sans regarder le futur`;
     }
-    return `<div><span class="cal-lab">${s.label}</span>${s.irregular ? ' <small title="La moitié des années ou plus sont allées dans l\'autre sens : la moyenne est tirée par quelques séances">irrégulier</small>' : ''}</div>${line ? `<div class="cal-acc" title="${detail}">${line}</div>` : ''}`;
+    const tone = up ? 'buy' : down ? 'sell' : 'wait';                                       // vert : haussier ; rouge : baissier ; ambre : neutre ou mixte (couleur demandée par le propriétaire du site)
+    return `<div><span class="sig sm ${tone}">${s.label}</span>${s.irregular ? ' <small title="La moitié des années ou plus sont allées dans l\'autre sens : la moyenne est tirée par quelques séances">irrégulier</small>' : ''}</div>${line ? `<div class="cal-acc" title="${detail}">${line}</div>` : ''}`;
   };
   // Saisonnalité d'un jour : étiquette indicative avec sa fiabilité mesurée, puis les faits : pour chaque indice, moyenne, médiane et années en hausse.
   const season = d => !d.open ? `<small>${d.weekend ? 'week-end' : 'Bourse fermée'}</small>`
