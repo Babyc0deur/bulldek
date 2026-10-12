@@ -5,7 +5,7 @@ const CALC = require('../calc.js'), { LIMITS } = require('../freshness.js'), T =
 
 const ROOT = path.join(__dirname, '..'), read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const PAGES = ['market.html', 'screener.html', 'compare.html', 'about.html'];
-const SITE_CODE = fs.readdirSync(ROOT).filter(f => /\.(js|html|css)$/.test(f) && !/^(server|store|guard|cftc|freshness|macro|debrief)\.js$/.test(f));   // tout ce que reçoit le navigateur
+const SITE_CODE = fs.readdirSync(ROOT).filter(f => /\.(js|html|css)$/.test(f) && !/^(server|store|guard|cftc|freshness|macro)\.js$/.test(f));   // tout ce que reçoit le navigateur
 
 // ---------- méthodologie : valeurs injectées depuis le code ----------
 const about = read('about.html');

@@ -45,37 +45,57 @@ test('Forex Factory : remplace le rendez-vous habituel de la même semaine, ne d
   assert.ok(!Object.values(e).flat().some(x => /German|Crude/.test(x.label)), 'autres devises et faible importance ignorées');
 });
 
-test('saisonnalité commune : sens et « fort » par période, lecture d\'ensemble ; Dow limité ; jours fermés', () => {
-  // ES, NQ, YM : chaque année de 2000 à 2025, le 6 octobre monte de 1 % (2 années sur 10 baissent de 0,5 %) ; le 7 baisse.
-  const mk = () => { const rows = []; let c = 100; for (let y = 2000; y <= 2025; y++) for (let d = 1; d <= 31; d++) { const t = Date.UTC(y, 9, d) / 1e3; const w = new Date(t * 1e3).getUTCDay(); if (w === 0 || w === 6) continue; c *= d === 6 ? (y % 5 === 0 ? 0.995 : 1.01) : d === 7 ? 0.99 : 1; rows.push([t, c]); } return rows; };
+test('saisonnalité du jour : moyenne, médiane et années en hausse par indice ; Dow limité à 20 ans ; jours fermés ; aucune étiquette de sens', () => {
+  // ES, NQ, YM : de 2000 à 2025, le 6 octobre monte de 1 % sauf 3 années (2005, 2010, 2025… multiples de 5) où il baisse de 0,5 % ; le 7 baisse de 1 %.
+  const mk = () => { const rows = []; let c = 100; for (let y = 2000; y <= 2025; y++) for (let d = 1; d <= 31; d++) { const t = Date.UTC(y, 9, d) / 1e3; const w = new Date(t * 1e3).getUTCDay(); if (w === 0 || w === 6) continue; c *= d === 6 ? (y % 5 === 0 ? 0.995 : 1.01) : d === 7 ? 0.99 : 1; rows.push([t, c, c, c]); } return rows; };
   const series = { ES: mk(), NQ: mk(), YM: mk() };
   const r = MC.monthCalendar({ year: 2026, month: 9, series, caps: { YM: 20 }, today: '2026-10-06' });
   const d6 = r.days.find(d => d.day === 6), d7 = r.days.find(d => d.day === 7), d10 = r.days.find(d => d.day === 10);
-  assert.equal(d6.today, true); assert.equal(d6.season.key, 'up-strong'); assert.equal(d6.season.label, 'Haussier fort');
+  assert.equal(d6.today, true); assert.deepEqual(Object.keys(d6.season), ['periods'], 'aucune étiquette ni sens dans la réponse');
+  const es15 = d6.season.periods[15].ES;
+  assert.ok(es15.n >= 8 && es15.mean > 0 && es15.median === 1 && es15.up > es15.n / 2 && es15.up < es15.n, JSON.stringify(es15));
   assert.ok(d6.season.periods[25].YM.n <= 20 && d6.season.periods[25].ES.n > d6.season.periods[25].YM.n, 'Dow limité à 20 ans');
-  assert.equal(d7.season.key, 'down-strong'); assert.equal(d10.open, false); assert.equal(d10.weekend, true);
-  assert.equal(MC.reading([{ dir: 1, strong: false, regular: true }, { dir: -1, strong: false, regular: true }, { dir: 0 }]).key, 'mixed');
-  assert.equal(MC.reading([{ dir: 1, strong: true, regular: true }, { dir: 1, strong: false, regular: false }, { dir: 0 }]).key, 'up-weak');
-  assert.equal(MC.reading([{ dir: 1, strong: true, regular: true }, { dir: 1, strong: false, regular: false }, { dir: 0 }]).irregular, true);
+  assert.ok(d7.season.periods[20].ES.median < 0 && d7.season.periods[20].ES.up === 0); assert.equal(d10.open, false); assert.equal(d10.weekend, true);
+  assert.equal(MC.reading, undefined); assert.equal(MC.periodDir, undefined);
+  // La moyenne peut être tirée par une année extrême : médiane et années en hausse montrent l'autre histoire.
+  const bad = []; for (let y = 2012; y <= 2025; y++) bad.push([Date.UTC(y, 9, 8) / 1e3, 100], [Date.UTC(y, 9, 9) / 1e3, y === 2015 ? 90 : 100.1]);
+  const f = MC.dayStats({ ES: bad }, 2026, 9, {})(9, 15).ES;
+  assert.ok(f.n === 13 && f.mean < 0 && f.median > 0 && f.up === 12, 'moyenne négative (une année à −10 %) mais médiane positive et 12 années sur 13 en hausse : ' + JSON.stringify(f));
 });
 
 // ---------- page ----------
+const fact = (mean, median, up, n) => ({ n, mean, median, up });
+const periodsOf = (es, nq, ym) => Object.fromEntries([15, 20, 25].map(p => [p, { ES: es(p), NQ: nq(p), YM: ym(p) }]));
 const day = (n, o) => ({ date: `2026-10-${String(n).padStart(2, '0')}`, day: n, weekday: 'mer.', weekend: false, open: true, holiday: null, today: false,
-  season: { key: 'neutral', label: 'Neutre', irregular: false, periods: Object.fromEntries([15, 20, 25].map(p => [p, { dir: 0, strong: false, ES: { mean: 0.1, up: 6, n: 10 }, NQ: { mean: -0.1, up: 4, n: 10 }, YM: { mean: 0, up: 5, n: 10 } }])) }, events: [], ...o });
+  season: { periods: periodsOf(p => fact(0.12, -0.05, 9, p === 15 ? 15 : 14), p => fact(-0.1, 0.1, 10, 14), p => fact(0.3, 0.2, 8, 12)) }, events: [], ...o });
 const MONTH = { view: 'month', year: 2026, month: 9, start: '2026-10-01', label: 'octobre 2026', periods: [15, 20, 25], months: ['2026-09', '2026-10', '2026-11'], officialUntil: '2026-12-23',
   today: '2026-10-06', thisWeek: '2026-10-05',
   days: [day(6, { today: true }), day(10, { weekday: 'sam.', weekend: true, open: false }), day(14, { events: [{ time: '08:30', kind: 'cpi', label: 'Inflation (CPI)', impact: 'high', source: 'officiel' }] }),
-    day(28, { season: { ...day(1).season, key: 'up-strong', label: 'Haussier fort' }, events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })] };
+    day(28, { events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })] };
 const runPage = (data, calls) => render({ src: path.join(__dirname, '..', 'calendarview.js'), fnName: '((a, root) => renderCalendar(a.data, root, q => a.calls.push(q)))', args: { data, calls }, now: Date.parse('2026-10-06T12:00:00Z'), calc: {} });
 
-test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif sur le mois en cours, jour courant, jours fermés, annonces colorées, points saillants', async () => {
+test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif, jour courant, jours fermés, annonces colorées, annonces majeures, avertissement', async () => {
   const calls = [], { root } = await runPage(MONTH, calls), h = root.innerHTML, text = h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
   assert.match(h, /id="calPrev"\s+aria-label="Mois précédent">‹/); assert.match(h, /id="calTitle" aria-live="polite">octobre 2026</); assert.match(h, /id="calNext"\s+aria-label="Mois suivant">›/);
   assert.match(h, /id="calToday" disabled>/); assert.match(h, /data-v="month" aria-pressed="true">Mois/);
   assert.match(h, /<tr class="cal-today">/); assert.match(h, /aujourd'hui/); assert.match(h, /<tr class="cal-off">[\s\S]*?week-end/);
   assert.match(h, /<li class="ev-high"><span class="ev-t">08:30<\/span> Inflation \(CPI\) <small>officiel<\/small><\/li>/);
-  assert.match(text, /Saisonnalité forte : mer\. 28 \(haussier fort\)/); assert.match(text, /le mer\. 28, la saisonnalité forte coïncide avec Décision de la Fed/);
-  assert.match(text, /Grosses annonces sans tendance saisonnière nette : mer\. 14 \(Inflation\)/); assert.match(text, /15 a · · 20 a · · 25 a ·/);
+  assert.match(text, /Annonces de forte importance : mer\. 14 \(Inflation\), mer\. 28 \(Décision de la Fed\)/);
+  // Faits sur la période choisie (20 ans par défaut) : moyenne, médiane, années en hausse, pour chaque indice.
+  assert.match(text, /ES moy\. \+0,12 % · méd\. −0,05 % · 9\/14 en hausse/); assert.match(text, /NQ moy\. −0,10 % · méd\. \+0,10 % · 10\/14 en hausse/); assert.match(text, /YM moy\. \+0,30 % · méd\. \+0,20 % · 8\/12 en hausse/);
+  assert.match(h, /data-p="20" aria-pressed="true">20 ans/); assert.match(h, /title="15 ans : ES moy\. \+0,12 %, méd\. −0,05 %, 9\/15 en hausse/);
+  // Avertissement en tête, et plus aucune étiquette de sens.
+  assert.match(text, /À lire avant d'utiliser ces chiffres/); assert.match(text, /il ne prédit pas le sens d'un jour/); assert.match(text, /55,9 %.*51,1 %.*54,6 %/);
+  const sansAvertissement = h.replace(/<div class="card cal-warn"[\s\S]*?<\/div>/, '');                    // l'avertissement cite volontairement les anciennes étiquettes
+  assert.doesNotMatch(sansAvertissement, /Haussier|Baissier|haussier|baissier|class="sig sm (buy|sell)"|↑|↓/, 'aucune étiquette ni flèche de sens dans le calendrier');
+});
+
+test('page : le choix de la période (15 / 20 / 25 ans) change les chiffres affichés sans recharger les données', async () => {
+  const calls = [], { el, root } = await runPage(MONTH, calls);
+  assert.match(root.innerHTML, /9\/14 en hausse/);
+  el('#calP').onclick({ target: { closest: () => ({ dataset: { p: '15' } }) } });
+  assert.match(root.innerHTML, /ES<\/b> moy\. \+0,12 % · méd\. −0,05 % · <b>9\/15<\/b> en hausse/); assert.deepEqual(calls, [], 'aucun appel au serveur');
+  el('#calP').onclick({ target: { closest: () => ({ dataset: { p: '20' } }) } });
 });
 
 test('page : flèches (mois précédent / suivant, bornées à la période), passage en vue semaine sur la semaine en cours', async () => {

@@ -76,6 +76,17 @@
   // Williams %R filtré par la tendance : une survente n'est un signal d'achat qu'au-dessus de la moyenne 200 séances (repli dans une tendance haussière),
   // un surachat n'est un signal de vente qu'en dessous (rebond dans une tendance baissière). Contre la tendance, le signal vaut 0. Sans moyenne : pas de filtre.
   const wrTrendSignal = (v, close, ma) => { const s = wrSignal(v); return ma == null || close == null ? s : s > 0 && close < ma ? 0 : s < 0 && close > ma ? 0 : s; };
+  // ATR (Average True Range, lissage de Wilder) sur n séances : amplitude moyenne d'une séance, écarts d'ouverture compris.
+  // Vrai range = max(plus haut − plus bas, |plus haut − clôture précédente|, |plus bas − clôture précédente|). rows = [[t, clôture, haut, bas]].
+  // Renvoie { value (points), pct (% de la dernière clôture), last (vrai range de la dernière séance), lastRatio (dernière séance / ATR) } ou null.
+  function atr(rows, n = 14) {
+    if (!rows || rows.length < n + 1) return null;
+    const tr = i => { const [, , h, l] = rows[i], pc = rows[i - 1][1]; return Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)); };
+    let a = 0; for (let i = 1; i <= n; i++) a += tr(i); a /= n;
+    for (let i = n + 1; i < rows.length; i++) a = (a * (n - 1) + tr(i)) / n;
+    const last = tr(rows.length - 1), close = rows[rows.length - 1][1];
+    return { value: a, pct: a / close * 100, last, lastRatio: a ? last / a : null, n };
+  }
   // Moyenne mobile simple des clôtures (colonne 1) sur n séances, alignée sur rows : null tant qu'il n'y a pas n séances.
   function sma(rows, n = THRESHOLDS.trendSma) {
     const out = new Array(rows.length).fill(null); let s = 0;
@@ -307,6 +318,6 @@
     return { ...sum, priceChgPct, reading: oiReading(priceChgPct, sum.chgPct) };
   }
 
-  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, wrTrendSignal, sma, seasonSignal, cotLabel,
+  return { oiSignal, oiSummary, closeOnOrBefore, oiReading, oiWeek, THRESHOLDS, confluenceClass, cotIndex, williamsR, seasonalWeek, seasonalDay, seasonalReport, PERIODS, DAYS_IN_MONTH, MONTH_STARTS, cotSignal, wrSignal, wrTrendSignal, sma, atr, seasonSignal, cotLabel,
     usFederalHolidays, cotReleaseDate, etInstant, nextCotRelease, alignByDay, alignedReturns, correlation, rollingCorrelation, rebase, performance };
 });

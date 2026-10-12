@@ -42,6 +42,6 @@ test('filet de sécurité : retiré au bout de 12 s si « load » n\'arrive jama
 
 test('section lente : retiré au plus tard 2,5 s après « load », même si une requête est encore en cours', async () => {
   const e = env();
-  e.window.fetch('/api/debrief?slug=sp500'); e.listeners.load(); await e.tick(2400);
+  e.window.fetch('/api/seasonal?code=13874A'); e.listeners.load(); await e.tick(2400);
   assert.equal(e.loading(), true); await e.tick(150); assert.equal(e.loading(), false, 'la fiche s\'affiche ; le débrief garde son propre message');
 });

@@ -72,8 +72,8 @@ async function runPanel(row, week = '22–28 sept.') {
   const box = { innerHTML: '' }, store = { confl: box };
   const document = { getElementById: id => store[id] || null, querySelector: () => null, body: {} };
   const fetch = async () => ({ json: async () => ({ week, rows: [row] }) });
-  const renderConfluence = new Function('BD', 'CALC', 'fetch', 'document', 'renderSeasonal', 'renderWR', 'renderCot', 'renderOI', 'renderDebrief', read('market.js') + '\nreturn renderConfluence;')(
-    { ...BD, shell: async () => null }, CALC, fetch, document, () => {}, () => {}, () => {}, () => {}, () => {});
+  const renderConfluence = new Function('BD', 'CALC', 'fetch', 'document', 'renderSeasonal', 'renderWR', 'renderCot', 'renderOI', read('market.js') + '\nreturn renderConfluence;')(
+    { ...BD, shell: async () => null }, CALC, fetch, document, () => {}, () => {}, () => {}, () => {});
   await renderConfluence({ slug: row.slug });
   return box.innerHTML;
 }

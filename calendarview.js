@@ -1,7 +1,9 @@
 // Page « Calendrier des indices » : affichage seulement. Tout est calculé côté serveur (monthcal.js → /api/calendrier).
 // Navigation comme un agenda : flèches ‹ › (mois ou semaine précédent / suivant), « Aujourd'hui », et choix de la vue Mois / Semaine
 // (la page s'ouvre sur le mois en cours ; rien n'est stocké dans le navigateur).
-const CAL_TONE = { 'up-strong': 'buy', up: 'buy', 'up-weak': 'buy', 'down-strong': 'sell', down: 'sell', 'down-weak': 'sell', mixed: 'wait', neutral: 'wait' };
+// La saisonnalité journalière n'est présentée qu'en faits (moyenne, médiane, années en hausse), sans étiquette « haussier » ni « baissier » :
+// testée sans regarder le futur (2012-2025), une telle étiquette n'avait aucune valeur prédictive pour le sens du jour.
+let calPeriod = 20;                                  // période affichée (15, 20 ou 25 ans) : simple variable de la page, rien n'est mémorisé dans le navigateur
 const calDay = 864e5, calIso = t => new Date(t).toISOString().slice(0, 10);
 const calMonthKey = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}`;
 const calShiftMonth = (key, k) => { const [y, m] = key.split('-').map(Number), i = m - 1 + k; return calMonthKey(y + Math.floor(i / 12), ((i % 12) + 12) % 12); };
@@ -10,9 +12,10 @@ const calShiftWeek = (monday, k) => calIso(Date.parse(monday + 'T00:00:00Z') + k
 function renderCalendar(data, root, nav = () => {}) {
   const $ = s => root.querySelector(s), months = data.months || [], week = data.view === 'week';
   const curMonth = calMonthKey(data.year, data.month);
-  const arrow = d => (d.dir > 0 ? '↑' : d.dir < 0 ? '↓' : '·') + (d.strong ? '*' : '');
+  if (!data.periods.includes(calPeriod)) calPeriod = data.periods.includes(20) ? 20 : data.periods[0];
   const num = v => (v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2).replace('.', ',') + ' %');
-  const tip = s => data.periods.map(n => `${n} ans : ` + ['ES', 'NQ', 'YM'].map(k => `${k} ${num(s.periods[n][k].mean)} (${s.periods[n][k].up}/${s.periods[n][k].n})`).join(', ')).join(' · ');
+  // Détail de toutes les périodes (infobulle) : pour chaque indice, moyenne, médiane et années en hausse.
+  const tip = s => data.periods.map(n => `${n} ans : ` + ['ES', 'NQ', 'YM'].map(k => { const x = s.periods[n][k]; return `${k} moy. ${num(x.mean)}, méd. ${num(x.median)}, ${x.up}/${x.n} en hausse`; }).join(' · ')).join('\n');
   const monthLabel = k => new Date(k + '-01T00:00:00Z').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const monthName = d => new Date(d.date + 'T00:00:00Z').toLocaleDateString('fr-FR', { month: 'short', timeZone: 'UTC' }).replace('.', '');
 
@@ -23,27 +26,39 @@ function renderCalendar(data, root, nav = () => {}) {
   const canPrev = week ? weekOk(prev) : inRange(prev), canNext = week ? weekOk(next) : inRange(next);
   const isNow = week ? data.start === data.thisWeek : curMonth === (data.today || '').slice(0, 7);
 
-  // Points saillants : jours de saisonnalité forte, annonces majeures, et coïncidences.
-  const open = data.days.filter(d => d.open), strong = open.filter(d => /strong/.test(d.season.key)), major = open.filter(d => d.events.some(e => e.impact === 'high'));
+  // Annonces majeures de la période affichée (faits : aucune lecture saisonnière).
+  const major = data.days.filter(d => d.open && d.events.some(e => e.impact === 'high'));
   const majorLabel = d => d.events.filter(e => e.impact === 'high').map(e => e.label.replace(/ ;.*$/, '').replace(/ \(.*\)$/, '')).join(', ');
   const dayName = d => `${d.weekday} ${d.day}${week ? ' ' + monthName(d) : ''}`;
-  const points = [];
-  if (strong.length) points.push(`Saisonnalité forte : ${strong.map(d => `<b>${dayName(d)}</b> (${d.season.label.toLowerCase()})`).join(', ')}.`);
-  const clash = strong.filter(d => d.events.some(e => e.impact === 'high'));
-  if (clash.length) points.push(`À surveiller : ${clash.map(d => `le ${dayName(d)}, la saisonnalité forte coïncide avec ${majorLabel(d)}`).join(' ; ')} — une annonce peut renverser la tendance du jour.`);
-  const calm = major.filter(d => d.season.key === 'neutral' || d.season.key === 'mixed');
-  if (calm.length) points.push(`Grosses annonces sans tendance saisonnière nette : ${calm.map(d => `${dayName(d)} (${majorLabel(d)})`).join(', ')} — c'est la publication qui décidera.`);
+  const points = major.length ? [`Annonces de forte importance : ${major.map(d => `<b>${dayName(d)}</b> (${majorLabel(d)})`).join(', ')}.`] : [];
 
+  // Saisonnalité d'un jour : pour chaque indice, moyenne, médiane et nombre d'années en hausse sur la période choisie. Aucune étiquette de sens.
   const season = d => !d.open ? `<small>${d.weekend ? 'week-end' : 'Bourse fermée'}</small>`
-    : `<span class="sig sm ${CAL_TONE[d.season.key]}">${d.season.label}</span>${d.season.irregular ? ' <small title="La moitié des années ou plus sont allées dans l\'autre sens : moyenne tirée par quelques séances">irrégulier</small>' : ''}<br><small class="cal-per" title="${tip(d.season)}">${data.periods.map(n => `${n} a ${arrow(d.season.periods[n])}`).join(' · ')}</small>`;
-  const events = d => { const ev = d.events.map(e => `<li class="ev-${e.impact}"><span class="ev-t">${e.time || '—'}</span> ${e.label} <small>${e.source}</small></li>`).join(''); return ev ? `<ul class="cal-ev">${ev}</ul>` : (d.open ? '<small>—</small>' : ''); };
+    : `<div class="cal-fact" title="${tip(d.season)}">${['ES', 'NQ', 'YM'].map(k => { const x = d.season.periods[calPeriod][k]; return x.n ? `<div><b>${k}</b> moy. ${num(x.mean)} · méd. ${num(x.median)} · <b>${x.up}/${x.n}</b> en hausse</div>` : `<div><b>${k}</b> <small>données insuffisantes</small></div>`; }).join('')}</div>`;
+  // Réaction historique des indices à ce type d'annonce : repère court (S&P 500), détail des trois indices au survol.
+  const R = (data.reactions && data.reactions.kinds) || {}, pc = v => (v == null ? '–' : v.toFixed(1).replace('.', ',')), sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + pc(Math.abs(v));
+  const react = kind => { const k = R[kind], es = k && k.ES; if (!es) return '';
+    const tipR = ['ES', 'NQ', 'YM'].filter(t => k[t]).map(t => `${t} : mouvement moyen ±${pc(k[t].meanAbs)} %, amplitude ${pc(k[t].meanRange)} % (×${pc(k[t].rangeRatio)} une séance ordinaire), en hausse ${k[t].up} % des fois, ${k[t].n} annonces`).join(' · ');
+    return ` <span class="ev-r" title="Depuis ${k.from.slice(0, 4)} : ${tipR}">ES ±${pc(es.meanAbs)} % · ampl. ×${pc(es.rangeRatio)}</span>`; };
+  const events = d => { const ev = d.events.map(e => `<li class="ev-${e.impact}"><span class="ev-t">${e.time || '—'}</span> ${e.label} <small>${e.source}</small>${react(e.kind)}</li>`).join(''); return ev ? `<ul class="cal-ev">${ev}</ul>` : (d.open ? '<small>—</small>' : ''); };
   const head = d => `${d.weekday} ${d.day}${week ? ' ' + monthName(d) : ''}${d.today ? ' <span class="sig sm wait">aujourd\'hui</span>' : ''}${d.holiday ? `<br><small>${d.holiday.label}</small>` : ''}`;
 
   const body = week
     ? `<div class="cal-week" id="calGrid">${data.days.map(d => `<section class="card cal-day ${d.today ? 'cal-today' : ''} ${d.open ? '' : 'cal-off'}" aria-label="${d.weekday} ${d.day} ${monthName(d)}"><h3>${head(d)}</h3><div class="cal-s">${season(d)}</div>${events(d)}</section>`).join('')}</div>`
     : `<div class="card"><div class="tw"><table class="cmp cal" id="calTbl">
-       <thead><tr><th scope="col">Jour</th><th scope="col">Saisonnalité ES / NQ / YM<br><small>15 · 20 · 25 ans</small></th><th scope="col">Annonces (heure de New York)</th></tr></thead>
+       <thead><tr><th scope="col">Jour</th><th scope="col">Saisonnalité du jour, ES / NQ / YM<br><small>faits sur ${calPeriod} ans : moyenne, médiane, années en hausse</small></th><th scope="col">Annonces (heure de New York)</th></tr></thead>
        <tbody>${data.days.map(d => `<tr class="${[d.today ? 'cal-today' : '', d.open ? '' : 'cal-off'].join(' ').trim()}"><th scope="row">${head(d)}</th><td>${season(d)}</td><td>${events(d)}</td></tr>`).join('')}</tbody></table></div></div>`;
+
+  // Tableau : réaction moyenne de ES, NQ et YM aux trois grandes annonces.
+  function reactTable() {
+    const kinds = ['cpi', 'nfp', 'fomc'].filter(k => R[k] && R[k].ES);
+    if (!kinds.length) return '';
+    const row = (k, t) => { const s = R[k][t]; return s ? `<tr><th scope="row">${t === 'ES' ? `${R[k].label}<br><small>depuis ${R[k].from.slice(0, 4)}</small>` : ''}</th><td>${t}</td><td>${s.n}</td><td class="${s.meanChg >= 0 ? 'pos' : 'neg'}">${sg(s.meanChg)} %</td><td>±${pc(s.meanAbs)} %</td><td>${s.up} %</td><td>${pc(s.meanRange)} %</td><td><b>×${pc(s.rangeRatio)}</b></td><td><small>${new Date(s.last.date + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })} : ${sg(s.last.chg)} %, ampl. ${pc(s.last.range)} %</small></td></tr>` : ''; };
+    return `<div class="card"><h2 class="sec">Réaction des indices aux grandes annonces</h2><div class="tw"><table class="cmp react-t">
+      <thead><tr><th scope="col">Annonce</th><th scope="col">Indice</th><th scope="col">Annonces</th><th scope="col">Variation moyenne</th><th scope="col">Mouvement moyen</th><th scope="col">En hausse</th><th scope="col">Amplitude moyenne</th><th scope="col">vs séance ordinaire</th><th scope="col">Dernière fois</th></tr></thead>
+      <tbody>${kinds.map(k => ['ES', 'NQ', 'YM'].map(t => row(k, t)).join('')).join('')}</tbody></table></div>
+      <p class="note">Séance du jour de l'annonce (clôture contre clôture précédente), sur les futures ajustés des changements de contrat. Mouvement moyen : variation moyenne en valeur absolue, quel que soit le sens. Amplitude : plus haut moins plus bas de la séance, en % du prix. « vs séance ordinaire » : amplitude du jour d'annonce rapportée à celle des autres séances de la même période (×1,3 = 30 % plus agitée). La décision de la Fed tombe à 14 h : la séance entière n'en dépend pas. Le repère « ES ±… · ampl. ×… » à côté de chaque annonce reprend ces chiffres pour le S&P 500 ; survolez-le pour les trois indices.</p></div>`;
+  }
 
   root.innerHTML = `
    <div class="cal-nav" role="toolbar" aria-label="Navigation du calendrier">
@@ -54,13 +69,18 @@ function renderCalendar(data, root, nav = () => {}) {
      </div>
      <div class="cal-tools">
        <button class="btn" id="calToday" ${isNow ? 'disabled' : ''}>Aujourd'hui</button>
+       <div class="ranges" id="calP" role="group" aria-label="Période de la saisonnalité">${data.periods.map(n => `<button class="btn ${n === calPeriod ? 'on' : ''}" data-p="${n}" aria-pressed="${n === calPeriod}">${n} ans</button>`).join('')}</div>
        <div class="ranges" id="calView" role="group" aria-label="Affichage"><button class="btn ${week ? '' : 'on'}" data-v="month" aria-pressed="${!week}">Mois</button><button class="btn ${week ? 'on' : ''}" data-v="week" aria-pressed="${week}">Semaine</button></div>
      </div>
    </div>
-   ${points.length ? `<div class="card"><h2 class="sec">Ce qui ressort ${week ? 'cette semaine-là' : 'en ' + data.label}</h2><ul class="rl-notes">${points.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
+   <div class="card cal-warn" role="note"><h2 class="sec">À lire avant d'utiliser ces chiffres</h2>
+     <p>Ce calendrier décrit le passé ; <b>il ne prédit pas le sens d'un jour</b>. Testé sans regarder le futur sur 3 521 jours (2012-2025), les jours que l'ancienne version de cette page étiquetait « haussier fort » ont monté 55,9 % du temps sur le S&amp;P 500, les jours « baissier fort » 51,1 %, contre 54,6 % pour l'ensemble des jours : aucune différence utile. Une moyenne est souvent tirée par quelques années extrêmes (2008) ; regardez la médiane et le nombre d'années en hausse, et gardez vos règles de risque.</p></div>
+   ${points.length ? `<div class="card"><h2 class="sec">${week ? 'Cette semaine-là' : 'En ' + data.label}</h2><ul class="rl-notes">${points.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
    ${body}
-   <p class="note">Flèches : sens commun des trois indices sur 15, 20 et 25 ans (* : chacun dans ce sens au moins 60 % des années). Survolez-les pour les moyennes et le nombre d'années en hausse. Couleur des annonces : <span class="ev-high">rouge</span> forte importance, <span class="ev-medium">ambre</span> moyenne, <span class="ev-low">gris</span> faible. Dates officielles connues jusqu'au ${new Date(data.officialUntil + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}.</p>`;
+   ${reactTable()}
+   <p class="note">Saisonnalité : variation de la séance (clôture contre clôture précédente) pour ce jour du mois, sur les ${calPeriod} dernières années complètes où le marché a coté ce jour-là. « 9/15 en hausse » : 9 années sur 15 ont monté. Survolez une case pour voir aussi les périodes de 15 et 25 ans. Couleur des annonces : <span class="ev-high">rouge</span> forte importance, <span class="ev-medium">ambre</span> moyenne, <span class="ev-low">gris</span> faible. Dates officielles connues jusqu'au ${new Date(data.officialUntil + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}.</p>`;
 
+  $('#calP').onclick = e => { const b = e.target.closest('button'); if (!b || +b.dataset.p === calPeriod) return; calPeriod = +b.dataset.p; renderCalendar(data, root, nav); };
   $('#calPrev').onclick = () => canPrev && nav(week ? { w: prev } : { m: prev });
   $('#calNext').onclick = () => canNext && nav(week ? { w: next } : { m: next });
   $('#calToday').onclick = () => nav(week ? { w: data.thisWeek } : {});

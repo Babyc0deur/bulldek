@@ -1,6 +1,6 @@
 // Volatilité (VIX, structure, volatilité réalisée) et dates clés (FOMC, CPI, emploi, échéances et roll des futures sur indices).
 const test = require('node:test'), assert = require('node:assert/strict');
-const V = require('../vol.js'), K = require('../keydates.js'), N = require('../narrative.js');
+const V = require('../vol.js'), K = require('../keydates.js');
 
 const days = (n, f) => Array.from({ length: n }, (_, i) => [new Date(Date.UTC(2025, 9, 1) + i * 864e5).toISOString().slice(0, 10), f(i)]);
 const spx = rets => { let c = 100; return [[0, c], ...rets.map((r, i) => [i + 1, c *= 1 + r])]; };
@@ -33,16 +33,6 @@ test('dates clés : vendredi saint, échéance avancée si la Bourse est fermée
   assert.ok(k.dates.every(x => x.date >= '2026-10-05' && x.date <= '2027-04-05'), 'fenêtre de 6 mois');
   assert.ok(k.dates.find(x => x.date === '2026-12-09').detail.includes('projections'), 'réunion avec projections économiques');
   assert.equal(k.officialUntil.cpi, '2026-12-31');
-});
-
-test('débrief des indices : paragraphe volatilité et dates clés ; rien pour les autres marchés', () => {
-  const vol = V.volatility({ vix: days(300, i => 20 - i * 0.02), vix3m: [['2026-07-27', 16]], spx: spx(Array(40).fill(0.0005)) });
-  const keyDates = K.keyDates(Date.UTC(2026, 11, 1), 1).dates;
-  const t = N.volStory({ group: 'Indices' }, { slug: 'sp500', name: 'S&P 500', group: 'Indices' }, { vol, keyDates });
-  assert.match(t, /Le VIX est à 14/); assert.match(t, /Dates clés à venir : .*Roll des futures sur indices le 10 décembre/);
-  assert.match(t, /vérifiez l'échéance/); assert.match(t, /stops proches/);
-  assert.equal(N.volStory({ group: 'Metals' }, { slug: 'gold', name: 'Or', group: 'Metals' }, { vol, keyDates }), null);
-  assert.equal(N.volStory({ group: 'Indices' }, { slug: 'sp500', group: 'Indices' }, { vol: null, keyDates: [] }), null);
 });
 
 test('dates clés : les dates lues chaque jour (FRED, page de la Fed) complètent les listes saisies et repoussent leur limite', () => {

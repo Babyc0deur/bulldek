@@ -86,27 +86,8 @@ function redactUrl(u) {
     return x.host + x.pathname.slice(0, 60) + (x.search ? x.search.slice(0, 40) : '');
   } catch { return String(u).replace(/(key|token|secret|pass)[^&]*/gi, '$1=…').slice(0, 80); }
 }
-// Annonces à venir (ou de la journée) pour des devises données, importance moyenne ou forte uniquement.
-function upcoming(events, ccys, now, hours = 48, back = 12) {
-  return (events || []).filter(e => ccys.includes(e.ccy) && (e.impact === 'High' || e.impact === 'Medium') && e.t >= now - back * 36e5 && e.t <= now + hours * 36e5).sort((a, b) => a.t - b.t);
-}
-
-// Fenêtre d'analyse du debrief. Du vendredi 22 h UTC au dimanche 22 h UTC les marchés à terme sont fermés : le debrief repose sur la clôture
-// du vendredi et l'agenda regarde vers la semaine qui s'ouvre (jusqu'au samedi suivant). Le reste du temps : 12 h en arrière, 48 h en avant.
-function horizon(now) {
-  const d = new Date(now), day = d.getUTCDay(), h = d.getUTCHours();
-  const weekend = day === 6 || (day === 0 && h < 22) || (day === 5 && h >= 22);
-  if (!weekend) return { weekend: false, hours: 48, back: 0 + 12 };
-  const monday = ((1 - day + 7) % 7) || 7, start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + monday), end = start + 5 * 864e5;   // samedi 00 h UTC : fin de la semaine qui s'ouvre
-  const mon = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((day - 1 + 7) % 7));       // lundi 00 h UTC : début du bilan de la semaine écoulée
-  return { weekend: true, hours: Math.max(1, (end - now) / 36e5), back: 0, start, recapHours: (now - mon) / 36e5 };
-}
-
-// Annonces déjà publiées (bilan) : importance moyenne ou forte, devises données, dans les `hours` dernières heures.
-const recent = (events, ccys, now, hours) => (events || []).filter(e => ccys.includes(e.ccy) && (e.impact === 'High' || e.impact === 'Medium') && e.t < now && e.t >= now - hours * 36e5).sort((a, b) => a.t - b.t);
-
 // ---- Lectures simples d'une série [[période, valeur]] ----
 const lastOf = s => (s && s.length ? s[s.length - 1] : null);
 const back = (s, n) => (s && s.length > n ? s[s.length - 1 - n] : null);
 
-module.exports = { AREAS, AREA_CODES, MARKET_CCY, marketCurrencies, areaOfCcy, cpiUrls, ratesUrls, mergeCpi, mergeRates, CALENDAR_URL, CALENDAR_NEXT_URL, fmpUrl, parseFmpCalendar, redactUrl, parseCsv, groupSeries, parseCpi, parseRates, parseCalendar, upcoming, recent, horizon, lastOf, back };
+module.exports = { AREAS, AREA_CODES, MARKET_CCY, marketCurrencies, areaOfCcy, cpiUrls, ratesUrls, mergeCpi, mergeRates, CALENDAR_URL, CALENDAR_NEXT_URL, fmpUrl, parseFmpCalendar, redactUrl, parseCsv, groupSeries, parseCpi, parseRates, parseCalendar, lastOf, back };

@@ -142,29 +142,12 @@ function dayStats(series, year, month, caps = {}) {
   return (day, n) => Object.fromEntries(TAGS.map(tag => {
     const s = per[tag], yrs = Math.min(n, caps[tag] || n), y0 = Math.max(s.first, year - yrs), v = [];
     for (let y = y0; y < year; y++) { const x = s.by[y] && s.by[y][day]; if (x != null) v.push(x); }
-    return [tag, { n: v.length, mean: v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 100) / 100 : null, up: v.filter(x => x > 0).length }];
+    const srt = v.slice().sort((a, b) => a - b), r2 = x => Math.round(x * 100) / 100;
+    return [tag, { n: v.length, mean: v.length ? r2(v.reduce((a, b) => a + b, 0) / v.length) : null, median: v.length ? r2(srt.length % 2 ? srt[srt.length >> 1] : (srt[srt.length / 2 - 1] + srt[srt.length / 2]) / 2) : null, up: v.filter(x => x > 0).length }];
   }));
 }
-const MIN_OBS = 5, HIT = CALC.THRESHOLDS.seasonHitRate;
-// Sens commun sur une période : 1 si les trois moyennes sont positives, −1 si négatives, 0 sinon ; « fort » si chacun a suivi ce sens au moins 60 % des années.
-function periodDir(st) {
-  const t = TAGS.map(k => st[k]);
-  if (t.some(x => x.mean == null || x.n < MIN_OBS)) return { dir: 0, strong: false, regular: false };
-  const dir = t.every(x => x.mean > 0) ? 1 : t.every(x => x.mean < 0) ? -1 : 0;
-  const share = x => (dir > 0 ? x.up : x.n - x.up) / x.n;
-  return { dir, strong: dir !== 0 && t.every(x => share(x) >= HIT), regular: dir === 0 || t.every(x => share(x) > 0.5) };
-}
-// Lecture d'ensemble des trois périodes.
-function reading(dirs) {
-  const up = dirs.filter(d => d.dir > 0).length, dn = dirs.filter(d => d.dir < 0).length, s = dirs.filter(d => d.strong).length, irr = dirs.some(d => d.dir !== 0 && !d.regular);
-  let key = 'neutral', label = 'Neutre';
-  if (up && dn) { key = 'mixed'; label = 'Mixte'; }
-  else if (up === 3) { key = s >= 2 ? 'up-strong' : 'up'; label = s >= 2 ? 'Haussier fort' : 'Haussier'; }
-  else if (dn === 3) { key = s >= 2 ? 'down-strong' : 'down'; label = s >= 2 ? 'Baissier fort' : 'Baissier'; }
-  else if (up === 2) { key = 'up-weak'; label = 'Plutôt haussier'; }
-  else if (dn === 2) { key = 'down-weak'; label = 'Plutôt baissier'; }
-  return { key, label, irregular: irr && key !== 'neutral' && key !== 'mixed' };
-}
+// Aucune étiquette « haussier » / « baissier » : testée sans regarder le futur (2012-2025, 3 521 jours), elle n'avait aucune valeur prédictive.
+// On ne publie que des faits : pour chaque indice, moyenne, médiane et nombre d'années en hausse.
 
 // Jours d'une plage de dates [start, start + count jours[. ff : calendrier Forex Factory ; auto : dates lues automatiquement ; caps : années maximales par indice.
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
@@ -175,9 +158,9 @@ function rangeDays({ start, count, series, caps = {}, ff = [], auto = null, toda
     const { stats, events, holidays } = monthData(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth());
     const d = ymd(t), w = new Date(t).getUTCDay(), dom = new Date(t).getUTCDate(), hol = holidays[d] || null;
     const open = w !== 0 && w !== 6 && !(hol && hol.kind === 'closed');
-    const per = Object.fromEntries(PERIODS.map(n => { const st = stats(dom, n); return [n, { ...periodDir(st), ...st }]; }));
+    const per = Object.fromEntries(PERIODS.map(n => [n, stats(dom, n)]));
     days.push({ date: d, day: dom, weekday: WD[w], weekend: w === 0 || w === 6, open, holiday: hol, today: d === today,
-      season: { ...reading(PERIODS.map(n => per[n])), periods: per }, events: events[d] || [] });
+      season: { periods: per }, events: events[d] || [] });
   }
   return days;
 }
@@ -198,4 +181,4 @@ function weekCalendar({ monday, series, caps = {}, ff = [], auto = null, today =
   return { view: 'week', year: a.getUTCFullYear(), month: a.getUTCMonth(), start: monday, label, periods: PERIODS, caps, officialUntil: knownUntil(auto), days: rangeDays({ start: monday, count: 7, series, caps, ff, auto, today }) };
 }
 
-module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, periodDir, reading, monthCalendar, weekCalendar, rangeDays, knownUntil, gdpLabel, nyDate, PERIODS };
+module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, monthCalendar, weekCalendar, rangeDays, knownUntil, gdpLabel, nyDate, PERIODS };

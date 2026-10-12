@@ -138,26 +138,6 @@ function regime(c) {
     : { ...base, key: 'deflation', label: 'Régime déflationniste / aversion au risque', text: `${cite} Actions et obligations évoluent en sens inverse : la croissance et la peur d'un ralentissement mènent le marché. Les obligations jouent leur rôle de refuge ; une hausse des obligations pèse sur les actions.` };
 }
 
-// Grands moteurs auxquels on compare n'importe quel marché : actions, obligations, dollar, or, pétrole.
-const DRIVERS = ['sp500', '10-year-t-note', 'us-dollar', 'gold', 'crude-oil'];
-// Corrélations d'un marché {slug, group} avec les moteurs (sauf lui-même et sa propre famille quand le lien serait une évidence), sur 60 séances, 1 an et tout l'historique,
-// avec la variation du moteur sur 5 séances. series : { slug: [[t, clôture, …], …] } doit contenir le marché et les moteurs. null si le marché n'a pas assez de séances.
-const bloc = f => (f === 'dollar' || f === 'refuge' ? 'devises' : f);          // dollar, yen et autres devises : même bloc (leur lien mutuel est une évidence)
-function profile(market, series, corr) {
-  const own = series[market.slug];
-  if (!own || own.length <= 60) return null;
-  const ownFam = familyOf(market.slug, market.group), mo = new Map(own.map(r => [isoDay(r[0]), r[1]])), od = own.map(r => isoDay(r[0]));
-  const drivers = [];
-  for (const slug of DRIVERS) {
-    const rows = series[slug], a = ASSETS.find(x => x[0] === slug);
-    if (!rows || rows.length <= 60 || slug === market.slug || bloc(familyOf(slug)) === bloc(ownFam) && ['actions', 'obligations', 'devises'].includes(bloc(ownFam))) continue;
-    const all = commonReturns(mo, new Map(rows.map(r => [isoDay(r[0]), r[1]])), od), at = n => round(corr(n === 'max' ? all : all.slice(-n)));
-    const n = rows.length, r60 = at(60), rMax = at('max');
-    drivers.push({ slug, name: a[1], family: familyOf(slug), r60, r250: at(250), rMax, chg5: round((rows[n - 1][1] / rows[n - 6][1] - 1) * 100), flip: isShift(r60, rMax) });
-  }
-  return { family: ownFam, drivers };
-}
-
 // ---------- Ratios intermarchés : un marché divisé par un autre ; la tendance du ratio dit lequel des deux surperforme ----------
 // Ratios pensés pour qui trade les indices : actions contre refuge, croissance contre valeur, petites contre grandes capitalisations, et les deux grands
 // facteurs externes (dollar, pétrole). up / down : ce que signifie un ratio qui monte / qui baisse.
@@ -199,4 +179,4 @@ function ratios(series, now = Date.now()) {
   return { updated: now, asOf: out.length ? isoDay(Math.max(...out.map(o => o.series[o.series.length - 1][0]))) : null, ratios: out };
 }
 
-module.exports = { regime, RATIOS, RATIO_SLUGS, ratios, ASSETS, SLUGS, WINDOWS, PAIRS, DRIVERS, FAMILY, familyOf, meaning, isShift, profile, commonReturns, readPair, build };
+module.exports = { regime, RATIOS, RATIO_SLUGS, ratios, ASSETS, SLUGS, WINDOWS, PAIRS, FAMILY, familyOf, meaning, isShift, commonReturns, readPair, build };

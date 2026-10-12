@@ -1,4 +1,4 @@
-// Routes macro et debrief du vrai serveur, avec un cache factice (aucun accès réseau : les données macro sont préchargées et fraîches).
+// Routes macro du vrai serveur, avec un cache factice (aucun accès réseau : les données macro sont préchargées et fraîches).
 const test = require('node:test'), assert = require('node:assert/strict');
 const { spawn } = require('node:child_process'), http = require('node:http');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
@@ -36,16 +36,10 @@ test('/api/calendar : annonces normalisées', async () => {
   assert.equal(c.events.length, 1); assert.equal(c.events[0].title, 'Core PCE');
 });
 
-test('/api/debrief : marché inconnu → 400 ; marché sans données de prix → indisponible (pas d\'invention)', async () => {
-  assert.equal((await get('/api/debrief?slug=nimportequoi')).status, 400); assert.equal((await get('/api/debrief')).status, 400);
-  const d = JSON.parse((await get('/api/debrief?slug=' + NQ.slug)).body);
-  assert.equal(d.available, false); assert.match(d.message, /insuffisantes/);
-});
-
 test('pages Inflation et Taux servies, avec leur script ; les modules serveur ne sont pas exposés', async () => {
   for (const [p, kind] of [['/inflation', 'cpi'], ['/taux', 'rates']]) { const r = await get(p); assert.equal(r.status, 200); assert.match(r.body, new RegExp(`data-kind="${kind}"`)); assert.match(r.body, /macroview\.js/); }
-  assert.equal((await get('/macroview.js')).status, 200); assert.equal((await get('/debriefview.js')).status, 200);
-  for (const p of ['/macro.js', '/debrief.js']) assert.equal((await get(p)).status, 404, p);
+  assert.equal((await get('/macroview.js')).status, 200);
+  for (const p of ['/macro.js']) assert.equal((await get(p)).status, 404, p);
 });
 
 test('/api/yields : rendements et VIX servis depuis le cache', async () => {

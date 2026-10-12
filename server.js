@@ -17,10 +17,10 @@ const STATIC = {
   '/markets.json': ['markets.json', 'application/json'], '/themes.css': ['themes.css', 'text/css'],
   '/favicon.svg': ['assets/logo-icon.svg', 'image/svg+xml'], '/logo.svg': ['assets/logo.svg', 'image/svg+xml'], '/loader.svg': ['assets/loader.svg', 'image/svg+xml'], '/logo-anim.svg': ['assets/logo-anim.svg', 'image/svg+xml'],
 };
-const SCRIPTS = new Set(['calendarview.js', 'intermarketview.js', 'macroview.js', 'debriefview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
+const SCRIPTS = new Set(['calendarview.js', 'intermarketview.js', 'macroview.js', 'shared.js', 'cot.js', 'seasonal.js', 'wr.js', 'calc.js', 'screener.js', 'market.js', 'compare.js', 'theme.js', 'gallery.js', 'oi.js']);
 
 const CFTC = 'https://publicreporting.cftc.gov/resource/';
-const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./cotsource.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js'), { debrief } = require('./debrief.js');
+const DAILY_MERGE = require('./dailymerge.js'), ADJ = require('./adjust.js'), REL = require('./cotsource.js'), VOL = require('./vol.js'), KEYDATES = require('./keydates.js'), MONTHCAL = require('./monthcal.js'), RELEASES = require('./releases.js'), EVENTSTATS = require('./eventstats.js'), INTER = require('./intermarket.js'), YIELDS = require('./yields.js'), MACRO = require('./macro.js');
 const { LEGACY_FIELDS, TFF_FIELDS, DISAGG_FIELDS, compactLegacy, compactTff, compactDisagg } = require('./cftc.js');
 
 // Cache en mémoire (lecture rapide), persisté ligne par ligne dans SQLite (repli JSON si indisponible). Voir store.js.
@@ -213,14 +213,25 @@ const MACRO_FETCH = {
     let fomc = [];
     try { fomc = RELEASES.parseFomcPage(await getText(RELEASES.FOMC_URL)); if (!fomc.length) failed.fomc = 'page lue mais aucune réunion trouvée'; }
     catch (e) { failed.fomc = String(e.message).slice(0, 120); log('calendrier officiel : page FOMC illisible (' + e.message + ')'); }
+    // Archives FOMC (2000 → veille de la page actuelle) : lues une fois, puis reprises du cache (elles ne changent plus).
+    const prev = cache.macro.releases, firstYear = fomc.length ? +fomc[0].slice(0, 4) : new Date().getUTCFullYear() - 6;
+    let fomcHistory = prev && prev.fomcHistory && prev.fomcHistory.length && +prev.fomcHistory.at(-1).slice(0, 4) >= firstYear - 1 ? prev.fomcHistory : [];
+    if (!fomcHistory.length) {
+      for (let y = 2000; y < firstYear; y++) {
+        try { fomcHistory.push(...RELEASES.parseFomcHistory(await getText(RELEASES.fomcHistoryUrl(y)))); } catch (e) { failed['fomc' + y] = String(e.message).slice(0, 60); }
+        await sleep(300);
+      }
+      logV('calendrier officiel : archives FOMC, ' + fomcHistory.length + ' réunions de 2000 à ' + (firstYear - 1));
+    }
     const key = process.env.FRED_API_KEY;
     if (key) {
       for (const [kind, [rid]] of Object.entries(RELEASES.RELEASES)) {
-        try { fred[kind] = RELEASES.parseFredDates(await getJSON(RELEASES.fredUrl(key, rid, from)), from); } catch (e) { failed[kind] = String(e.message).slice(0, 120); log('calendrier officiel : FRED ' + kind + ' indisponible (' + e.message + ')'); }
+        const since = RELEASES.HISTORY_KINDS.includes(kind) ? RELEASES.HISTORY_FROM : from;          // inflation et emploi : tout l'historique (réaction des indices)
+        try { fred[kind] = RELEASES.parseFredDates(await getJSON(RELEASES.fredUrl(key, rid, since)), since); } catch (e) { failed[kind] = String(e.message).slice(0, 120); log('calendrier officiel : FRED ' + kind + ' indisponible (' + e.message + ')'); }
         await sleep(300);
       }
     } else logV('calendrier officiel : FRED_API_KEY absente, seules les décisions de la Fed sont lues automatiquement');
-    const out = { ...RELEASES.build({ fred, fomc }), fredKey: !!key, failed };
+    const out = { ...RELEASES.build({ fred, fomc, fomcHistory }), fredKey: !!key, failed };
     if (!out.events.length && !out.fomc.length) throw new Error('aucune date officielle lue : ' + Object.entries(failed).map(([k, v]) => k + ' ' + v).join(' ; ').slice(0, 300));
     logV('calendrier officiel : ' + out.fomc.length + ' réunions de la Fed, ' + out.events.length + ' publications FRED (' + Object.keys(fred).length + ' statistiques)');
     return out;
@@ -257,7 +268,6 @@ async function macroData(name) {
   try { return await flight('macro:' + name, refreshMacro)(name); }
   catch (e) { macroFail[name] = Date.now(); noteError('macro', name, e); log('macro', name, 'échec :', e.message); return c || null; }
 }
-const macroSnapshot = () => ({ cpi: cache.macro.cpi || null, rates: cache.macro.rates || null, yields: cache.macro.yields || null });
 
 // ---- HTTP ----
 // Réponse avec ETag (304 si inchangé) et compression gzip au-delà de 1 Ko.
@@ -362,7 +372,7 @@ function screener() {
     // Open interest : lecture de la dernière semaine (prix du mardi contre open interest). Un changement de contrat récent fausse la variation de prix : signal neutralisé.
     const oiw = CALC.oiWeek(cot.hist, d);
     const sig = { cot: REL.cotSig(src, idx6), season: CALC.seasonSignal(season), wr: roll ? 0 : CALC.wrTrendSignal(w, A.at(-1)[1], ma), oi: roll || !oiw ? 0 : CALC.oiSignal(oiw.reading) };
-    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cl.date, netC: net.at(-1), cotSource: src, cotLabel: REL.COT_SOURCES[src].label, tffIdx, trend, wrZone: CALC.wrSignal(w),
+    return { ...base, price: last[1], priceDate: last[0], chgPct: (last[1] / prev[1] - 1) * 100, cotDate: cl.date, netC: net.at(-1), cotSource: src, cotLabel: REL.COT_SOURCES[src].label, tffIdx, trend, wrZone: CALC.wrSignal(w), atr: CALC.atr(A, 14),
       idx6, idx36, wr: w, roll, season, seasonDay, sig, score: sig.cot + sig.season + sig.wr + sig.oi,
       oi: oiw ? { last: oiw.last, chgPct: oiw.chgPct, priceChgPct: oiw.priceChgPct, key: oiw.reading.key, label: oiw.reading.label } : null };
   });
@@ -404,6 +414,17 @@ function calendarMonths(now = Date.now()) {
   return out;
 }
 const calMemo = new Map();
+// Réaction historique des indices aux annonces (eventstats.js), recalculée quand les prix ou les dates officielles changent.
+let reactMemo = { stamp: '', val: null };
+function reactionsData(series) {
+  const auto = cache.macro.releases || {}, stamp = Object.values(series).map(s => s.length + ':' + (s.at(-1) || [0])[0]).join(',') + '|' + (cache.ts.macro.releases || 0);
+  if (reactMemo.val && reactMemo.stamp === stamp) return reactMemo.val;
+  const fromAuto = kind => (auto.events || []).filter(e => e[2] === kind).map(e => e[0]);
+  const val = EVENTSTATS.reactions(series, { cpi: [...KEYDATES.CPI, ...fromAuto('cpi')], nfp: [...KEYDATES.NFP, ...fromAuto('nfp')],
+    fomc: [...KEYDATES.FOMC, ...(auto.fomc || []), ...(auto.fomcHistory || [])] });
+  reactMemo = { stamp, val };
+  return val;
+}
 function calendarData(key, now = Date.now(), week = null) {
   const [y, m] = key.split('-').map(Number), today = MONTHCAL.nyDate(now);
   const series = {}; for (const [tag, slug] of [['ES', 'sp500'], ['NQ', 'nasdaq-100'], ['YM', 'dow-jones']]) { const mk = MARKETS.find(x => x.slug === slug); series[tag] = (mk && adjusted(mk).rows) || []; }
@@ -411,7 +432,7 @@ function calendarData(key, now = Date.now(), week = null) {
   if (hit && hit.stamp === stamp) return hit.val;
   const opts = { series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], auto: cache.macro.releases || null, today };
   const months = calendarMonths(now), monday = MONTHCAL.nyDate(Date.parse(today + 'T12:00:00Z') - ((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7) * 864e5);
-  const val = { months, today, thisWeek: monday, ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
+  const val = { months, today, thisWeek: monday, reactions: reactionsData(series), ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
   if (calMemo.size > 60) calMemo.clear();
   calMemo.set(id, { stamp, val });
   return val;
@@ -492,17 +513,6 @@ const server = http.createServer({ maxHeaderSize: 8192 }, async (req, res) => {
     }
     if (u.pathname === '/api/yields') { const y = await macroData('yields'); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.yields || 0, data: y })); }
     if (u.pathname === '/api/calendar') { const ev = await macroData('calendar'); return send(res, 200, JSON.stringify({ updated: cache.ts.macro.calendar || 0, events: ev || [] })); }
-    if (u.pathname === '/api/debrief') {                                        // ?slug=… : synthèse du jour d'un marché
-      const m = MARKETS.find(x => x.slug === u.searchParams.get('slug'));
-      if (!m) return send(res, 400, '{"error":"marché inconnu"}');
-      await macroData('calendar');                                                // rapide, indispensable
-      await macroData('yields');                                                              // FRED : rapide et fiable
-      for (const n of ['cpi', 'rates']) macroData(n).catch(() => {});                        // l'OCDE est lente et capricieuse : le debrief n'attend pas, il utilise ce qui est en cache
-      const row = screener().rows.find(r => r.slug === m.slug);
-      let inter = null;                                                           // intermarchés : indices uniquement
-      if (m.group === 'Indices') { const series = {}; for (const s of [m.slug, ...INTER.DRIVERS]) { const mm = MARKETS.find(x => x.slug === s); if (mm && cache.daily[mm.code]) series[s] = adjusted(mm).rows; } inter = { vol: volData(), keyDates: KEYDATES.keyDates(Date.now(), 2, cache.macro.releases || null).dates, ...(INTER.profile(m, series, CALC.correlation) || {}), regime: intermarket().regime, ratios: ratiosData().ratios.map(({ series: _s, ...r }) => r) }; }
-      return send(res, 200, JSON.stringify(debrief({ market: m, row, macro: macroSnapshot(), events: cache.macro.calendar || [], now: Date.now(), daily: adjusted(m).rows, inter })));
-    }
     if (u.pathname.startsWith('/api/')) {
       const m = BY_CODE[u.searchParams.get('code')];
       if (!m) return send(res, 400, '{"error":"marché inconnu"}');

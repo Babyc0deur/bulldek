@@ -5,6 +5,9 @@
 // Les heures (New York) sont celles, fixes, de chaque publication ; Forex Factory les confirme la semaine même.
 const FRED_API = 'https://api.stlouisfed.org/fred/release/dates';
 const FOMC_URL = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
+// Archives par année (réunions programmées) : la page ci-dessus ne couvre que les dernières années.
+const fomcHistoryUrl = year => `https://www.federalreserve.gov/monetarypolicy/fomchistorical${year}.htm`;
+const HISTORY_FROM = '2000-01-01', HISTORY_KINDS = ['cpi', 'nfp'];               // statistiques dont on garde tout l'historique (réaction des indices)
 // type d'annonce (monthcal.js → KINDS) : [identifiant de publication FRED, heure de New York]
 const RELEASES = {
   nfp: [50, '08:30'], cpi: [10, '08:30'], ppi: [46, '08:30'], retail: [9, '08:30'], gdp: [53, '08:30'], pce: [54, '08:30'],
@@ -38,12 +41,25 @@ function parseFomcPage(html) {
   return [...new Set(out)].sort();
 }
 
+// Page d'archives d'une année → ['AAAA-MM-JJ'] (jour de la décision). Intitulés « January 29-30 Meeting - 2008 », « April/May 30-1 Meeting - 2019 » ;
+// les conférences téléphoniques ne sont pas des réunions programmées : ignorées.
+function parseFomcHistory(html) {
+  const out = [];
+  for (const m of String(html).matchAll(/<h5[^>]*>\s*([A-Za-z]+(?:\/[A-Za-z]+)?)\s+(\d{1,2})(?:-(\d{1,2}))?\s+Meeting\s*-\s*(\d{4})\s*<\/h5>/g)) {
+    const months = m[1].toLowerCase().split('/').map(s => MONTHS[s.slice(0, 3)]);
+    if (months.some(x => x == null)) continue;
+    const day = +(m[3] || m[2]), mon = m[3] && months.length > 1 && +m[3] < +m[2] ? months[1] : months[0];
+    out.push(new Date(Date.UTC(+m[4], mon, day)).toISOString().slice(0, 10));
+  }
+  return [...new Set(out)].sort();
+}
+
 // Assemble le résultat stocké en cache : { at, fomc: [...], events: [[date, heure, type]], sources: {...} }.
-function build({ fred = {}, fomc = [] }, now = Date.now()) {
+function build({ fred = {}, fomc = [], fomcHistory = [] }, now = Date.now()) {
   const events = [];
   for (const [kind, dates] of Object.entries(fred)) for (const d of dates) events.push([d, RELEASES[kind][1], kind]);
   events.sort((a, b) => a[0].localeCompare(b[0]));
-  return { at: now, fomc, events, sources: { fred: Object.keys(fred).length, fomc: fomc.length } };
+  return { at: now, fomc, fomcHistory, events, sources: { fred: Object.keys(fred).length, fomc: fomc.length, fomcHistory: fomcHistory.length } };
 }
 
-module.exports = { RELEASES, FOMC_URL, fredUrl, parseFredDates, parseFomcPage, build };
+module.exports = { RELEASES, FOMC_URL, HISTORY_FROM, HISTORY_KINDS, fomcHistoryUrl, fredUrl, parseFredDates, parseFomcPage, parseFomcHistory, build };

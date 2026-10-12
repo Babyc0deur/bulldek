@@ -47,7 +47,7 @@ Au premier démarrage, le serveur télécharge les données (1 à 2 minutes) : l
 | `/inflation`, `/taux` | Inflation (CPI) et taux d'intérêt de 19 zones, comparés deux à deux (OCDE) |
 | `/a-propos` | Méthodologie (valeurs injectées depuis le code), limites connues et vie privée |
 | `/api/cot`, `/api/tff`, `/api/disagg`, `/api/daily`, `/api/prices`, `/api/seasonal` `?code=…` | Données par marché |
-| `/api/macro?kind=cpi|rates`, `/api/calendar`, `/api/debrief?slug=…` | Inflation et taux, annonces économiques, debrief du jour d'un marché |
+| `/api/macro?kind=cpi|rates`, `/api/calendar` | Inflation et taux, annonces économiques |
 | `/api/ratios` | Six ratios intermarchés (actions/obligations, Nasdaq/S&P, Nasdaq/Dow, S&P/dollar, S&P/pétrole, cuivre/obligations) : série complète, variation, position sur 1 an, lecture |
 | `/api/intermarket` | Corrélations croisées calculées sur les séances quotidiennes en cache (mémorisées 5 min, aucun appel externe) |
 | `/api/yields` | Rendements, courbe, taux réel, VIX et VIX 3 mois (FRED) |
