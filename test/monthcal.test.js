@@ -45,33 +45,52 @@ test('Forex Factory : remplace le rendez-vous habituel de la même semaine, ne d
   assert.ok(!Object.values(e).flat().some(x => /German|Crude/.test(x.label)), 'autres devises et faible importance ignorées');
 });
 
-test('saisonnalité du jour : moyenne, médiane et années en hausse par indice ; Dow limité à 20 ans ; jours fermés ; aucune étiquette de sens', () => {
+test('saisonnalité du jour : étiquette indicative et faits (moyenne, médiane, années en hausse) ; Dow limité à 20 ans ; jours fermés', () => {
   // ES, NQ, YM : de 2000 à 2025, le 6 octobre monte de 1 % sauf 3 années (2005, 2010, 2025… multiples de 5) où il baisse de 0,5 % ; le 7 baisse de 1 %.
   const mk = () => { const rows = []; let c = 100; for (let y = 2000; y <= 2025; y++) for (let d = 1; d <= 31; d++) { const t = Date.UTC(y, 9, d) / 1e3; const w = new Date(t * 1e3).getUTCDay(); if (w === 0 || w === 6) continue; c *= d === 6 ? (y % 5 === 0 ? 0.995 : 1.01) : d === 7 ? 0.99 : 1; rows.push([t, c, c, c]); } return rows; };
   const series = { ES: mk(), NQ: mk(), YM: mk() };
   const r = MC.monthCalendar({ year: 2026, month: 9, series, caps: { YM: 20 }, today: '2026-10-06' });
   const d6 = r.days.find(d => d.day === 6), d7 = r.days.find(d => d.day === 7), d10 = r.days.find(d => d.day === 10);
-  assert.equal(d6.today, true); assert.deepEqual(Object.keys(d6.season), ['periods'], 'aucune étiquette ni sens dans la réponse');
+  assert.equal(d6.today, true); assert.equal(d6.season.key, 'up-strong'); assert.equal(d6.season.label, 'Haussier fort');
   const es15 = d6.season.periods[15].ES;
   assert.ok(es15.n >= 8 && es15.mean > 0 && es15.median === 1 && es15.up > es15.n / 2 && es15.up < es15.n, JSON.stringify(es15));
   assert.ok(d6.season.periods[25].YM.n <= 20 && d6.season.periods[25].ES.n > d6.season.periods[25].YM.n, 'Dow limité à 20 ans');
   assert.ok(d7.season.periods[20].ES.median < 0 && d7.season.periods[20].ES.up === 0); assert.equal(d10.open, false); assert.equal(d10.weekend, true);
-  assert.equal(MC.reading, undefined); assert.equal(MC.periodDir, undefined);
+  assert.equal(r.days.find(d => d.day === 7).season.key, 'down-strong');
+  assert.equal(MC.reading([{ dir: 1, strong: false, regular: true }, { dir: -1, strong: false, regular: true }, { dir: 0 }]).key, 'mixed');
+  assert.equal(MC.reading([{ dir: 1, strong: true, regular: true }, { dir: 1, strong: false, regular: false }, { dir: 0 }]).key, 'up-weak');
+  assert.equal(MC.reading([{ dir: 1, strong: true, regular: true }, { dir: 1, strong: false, regular: false }, { dir: 0 }]).irregular, true);
   // La moyenne peut être tirée par une année extrême : médiane et années en hausse montrent l'autre histoire.
   const bad = []; for (let y = 2012; y <= 2025; y++) bad.push([Date.UTC(y, 9, 8) / 1e3, 100], [Date.UTC(y, 9, 9) / 1e3, y === 2015 ? 90 : 100.1]);
   const f = MC.dayStats({ ES: bad }, 2026, 9, {})(9, 15).ES;
   assert.ok(f.n === 13 && f.mean < 0 && f.median > 0 && f.up === 12, 'moyenne négative (une année à −10 %) mais médiane positive et 12 années sur 13 en hausse : ' + JSON.stringify(f));
 });
 
+test('fiabilité mesurée des étiquettes : rejeu sans regarder le futur, part de hausses et de baisses par étiquette, référence tous jours', () => {
+  // Marché sans aucune régularité (hausse un jour sur deux, motif fixe) : une étiquette ne peut pas prédire mieux que le hasard.
+  const mk = (seed) => { const rows = []; let c = 100, s = seed; for (let y = 2000; y <= 2025; y++) for (let mo = 0; mo < 12; mo++) for (let d = 1; d <= 28; d++) { const t = Date.UTC(y, mo, d) / 1e3, w = new Date(t * 1e3).getUTCDay(); if (w === 0 || w === 6) continue; s = (s * 1664525 + 1013904223) % 4294967296; c *= 1 + (s / 4294967296 - 0.5) * 0.02; rows.push([t, c, c, c]); } return rows; };
+  const a = MC.labelAccuracy({ ES: mk(1), NQ: mk(2), YM: mk(3) }, { YM: 20 }, 2012, 2025);
+  assert.ok(a.days > 2500 && a.from === 2012 && a.to === 2025);
+  assert.ok(Math.abs(a.all.ES.up + a.all.ES.down - 100) < 0.2, 'hausse + baisse ≈ 100 % (rares jours sans variation)');
+  assert.equal(Object.values(a.labels).reduce((s, l) => s + l.n, 0), a.days, 'chaque jour a exactement une étiquette');
+  for (const [k, l] of Object.entries(a.labels)) if (l.n > 300) assert.ok(Math.abs(l.ES.up - a.all.ES.up) < 8, k + ' : sans régularité, écart au hasard faible : ' + l.ES.up + ' vs ' + a.all.ES.up);
+  // Causal : changer les prix d'une année postérieure ne change pas les étiquettes des années antérieures.
+  const s1 = { ES: mk(1), NQ: mk(2), YM: mk(3) }, s2 = { ES: mk(1).map(r => (new Date(r[0] * 1e3).getUTCFullYear() >= 2020 ? [r[0], r[1] * 5 + Math.sin(r[0]), r[2], r[3]] : r)), NQ: mk(2), YM: mk(3) };
+  const f1 = MC.dayStats(s1, 2015, 3, {}), f2 = MC.dayStats(s2, 2015, 3, {});
+  for (let d = 1; d <= 28; d++) assert.deepEqual(MC.labelOf(f1, d), MC.labelOf(f2, d), 'jour ' + d + ' : les années postérieures ne doivent pas compter');
+});
+
 // ---------- page ----------
 const fact = (mean, median, up, n) => ({ n, mean, median, up });
 const periodsOf = (es, nq, ym) => Object.fromEntries([15, 20, 25].map(p => [p, { ES: es(p), NQ: nq(p), YM: ym(p) }]));
 const day = (n, o) => ({ date: `2026-10-${String(n).padStart(2, '0')}`, day: n, weekday: 'mer.', weekend: false, open: true, holiday: null, today: false,
-  season: { periods: periodsOf(p => fact(0.12, -0.05, 9, p === 15 ? 15 : 14), p => fact(-0.1, 0.1, 10, 14), p => fact(0.3, 0.2, 8, 12)) }, events: [], ...o });
+  season: { key: 'neutral', label: 'Neutre', irregular: false, periods: periodsOf(p => fact(0.12, -0.05, 9, p === 15 ? 15 : 14), p => fact(-0.1, 0.1, 10, 14), p => fact(0.3, 0.2, 8, 12)) }, events: [], ...o });
 const MONTH = { view: 'month', year: 2026, month: 9, start: '2026-10-01', label: 'octobre 2026', periods: [15, 20, 25], months: ['2026-09', '2026-10', '2026-11'], officialUntil: '2026-12-23',
   today: '2026-10-06', thisWeek: '2026-10-05',
   days: [day(6, { today: true }), day(10, { weekday: 'sam.', weekend: true, open: false }), day(14, { events: [{ time: '08:30', kind: 'cpi', label: 'Inflation (CPI)', impact: 'high', source: 'officiel' }] }),
-    day(28, { events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })] };
+    day(28, { season: { ...day(1).season, key: 'down-strong', label: 'Baissier fort', irregular: true }, events: [{ time: '14:00', kind: 'fomc', label: 'Décision de la Fed (FOMC) ; conférence', impact: 'high', source: 'officiel' }] })],
+  accuracy: { from: 2012, to: 2025, days: 3521, all: { n: 3521, ES: { up: 54.6, down: 44.7 }, NQ: { up: 55, down: 44 }, YM: { up: 54, down: 45 } },
+    labels: { 'up-strong': { n: 555, ES: { up: 55.9, down: 43.1 }, NQ: { up: 55.5, down: 44.5 }, YM: { up: 57.3, down: 42.3 } }, 'down-strong': { n: 274, ES: { up: 51.1, down: 48.2 }, NQ: { up: 50.7, down: 48.2 }, YM: { up: 50.7, down: 49.3 } }, neutral: { n: 1003, ES: { up: 55.8, down: 43.7 }, NQ: { up: 55.5, down: 44.5 }, YM: { up: 54.2, down: 45.5 } } } } };
 const runPage = (data, calls) => render({ src: path.join(__dirname, '..', 'calendarview.js'), fnName: '((a, root) => renderCalendar(a.data, root, q => a.calls.push(q)))', args: { data, calls }, now: Date.parse('2026-10-06T12:00:00Z'), calc: {} });
 
 test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif, jour courant, jours fermés, annonces colorées, annonces majeures, avertissement', async () => {
@@ -84,10 +103,20 @@ test('page, vue mois : titre entre deux flèches, « Aujourd\'hui » inactif, jo
   // Faits sur la période choisie (20 ans par défaut) : moyenne, médiane, années en hausse, pour chaque indice.
   assert.match(text, /ES moy\. \+0,12 % · méd\. −0,05 % · 9\/14 en hausse/); assert.match(text, /NQ moy\. −0,10 % · méd\. \+0,10 % · 10\/14 en hausse/); assert.match(text, /YM moy\. \+0,30 % · méd\. \+0,20 % · 8\/12 en hausse/);
   assert.match(h, /data-p="20" aria-pressed="true">20 ans/); assert.match(h, /title="15 ans : ES moy\. \+0,12 %, méd\. −0,05 %, 9\/15 en hausse/);
-  // Avertissement en tête, et plus aucune étiquette de sens.
-  assert.match(text, /À lire avant d'utiliser ces chiffres/); assert.match(text, /il ne prédit pas le sens d'un jour/); assert.match(text, /55,9 %.*51,1 %.*54,6 %/);
-  const sansAvertissement = h.replace(/<div class="card cal-warn"[\s\S]*?<\/div>/, '');                    // l'avertissement cite volontairement les anciennes étiquettes
-  assert.doesNotMatch(sansAvertissement, /Haussier|Baissier|haussier|baissier|class="sig sm (buy|sell)"|↑|↓/, 'aucune étiquette ni flèche de sens dans le calendrier');
+  // Étiquettes indicatives, avec leur fiabilité mesurée juste dessous (valeurs venues du serveur), jamais en vert ni en rouge.
+  assert.match(h, /<span class="cal-lab">Neutre<\/span>/); assert.match(h, /<span class="cal-lab">Baissier fort<\/span> <small title="[^"]*">irrégulier<\/small>/);
+  assert.match(text, /Pas de lecture : le S&P 500 monte 55,8 % de ces jours \(tous les jours : 54,6 %\)/);
+  assert.match(text, /S&P 500 : a baissé 48,2 % des jours ainsi étiquetés \(tous les jours : 44,7 %\) · 274 jours/);
+  assert.match(h, /title="ES : monte 51,1 %, baisse 48,2 % \(tous les jours : monte 54,6 %, baisse 44,7 %\) · NQ : monte 50,7 %/);
+  assert.doesNotMatch(h, /class="sig sm (buy|sell)"|↑|↓/, 'jamais de pastille verte ou rouge, ni de flèche de sens');
+  // Avertissement en tête : chiffres mesurés, et phrase exacte (les jours « baissier fort » ont monté plus d'une fois sur deux).
+  assert.match(text, /Ces étiquettes sont indicatives, pas des signaux/); assert.match(text, /pas ce qu'ils feront/);
+  assert.match(text, /3 521 jours \(2012-2025\), le S&P 500 a monté .*?des jours « haussier fort », 51,1 % des jours « baissier fort » \(donc plus d'une fois sur deux\) et 54,6 % de l'ensemble des jours : l'étiquette ne dit presque rien du sens du jour/);
+});
+
+test('page : sans mesure de fiabilité fournie, aucune valeur inventée', async () => {
+  const { root } = await runPage({ ...MONTH, accuracy: undefined }, []), text = root.innerHTML.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(text, /Les étiquettes n'ont pas été testées ici/); assert.doesNotMatch(text, /ainsi étiquetés/); assert.match(text, /Baissier fort/);
 });
 
 test('page : le choix de la période (15 / 20 / 25 ans) change les chiffres affichés sans recharger les données', async () => {

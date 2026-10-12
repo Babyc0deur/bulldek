@@ -414,6 +414,15 @@ function calendarMonths(now = Date.now()) {
   return out;
 }
 const calMemo = new Map();
+// Fiabilité mesurée des étiquettes de saisonnalité du Calendrier (monthcal.js → labelAccuracy), recalculée quand les prix changent.
+let accMemo = { stamp: '', val: null };
+function accuracyData(series) {
+  const stamp = Object.values(series).map(s => s.length + ':' + (s.at(-1) || [0])[0]).join(',') + '|' + MONTHCAL.nyDate(Date.now()).slice(0, 4);
+  if (accMemo.val && accMemo.stamp === stamp) return accMemo.val;
+  const val = MONTHCAL.labelAccuracy(series, { YM: SEASON_CAPS['dow-jones'] }, 2012, +MONTHCAL.nyDate(Date.now()).slice(0, 4) - 1);
+  accMemo = { stamp, val };
+  return val;
+}
 // Réaction historique des indices aux annonces (eventstats.js), recalculée quand les prix ou les dates officielles changent.
 let reactMemo = { stamp: '', val: null };
 function reactionsData(series) {
@@ -432,7 +441,7 @@ function calendarData(key, now = Date.now(), week = null) {
   if (hit && hit.stamp === stamp) return hit.val;
   const opts = { series, caps: { YM: SEASON_CAPS['dow-jones'] }, ff: cache.macro.calendar || [], auto: cache.macro.releases || null, today };
   const months = calendarMonths(now), monday = MONTHCAL.nyDate(Date.parse(today + 'T12:00:00Z') - ((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7) * 864e5);
-  const val = { months, today, thisWeek: monday, reactions: reactionsData(series), ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
+  const val = { months, today, thisWeek: monday, reactions: reactionsData(series), accuracy: accuracyData(series), ...(week ? MONTHCAL.weekCalendar({ monday: week, ...opts }) : MONTHCAL.monthCalendar({ year: y, month: m - 1, ...opts })) };
   if (calMemo.size > 60) calMemo.clear();
   calMemo.set(id, { stamp, val });
   return val;

@@ -146,8 +146,49 @@ function dayStats(series, year, month, caps = {}) {
     return [tag, { n: v.length, mean: v.length ? r2(v.reduce((a, b) => a + b, 0) / v.length) : null, median: v.length ? r2(srt.length % 2 ? srt[srt.length >> 1] : (srt[srt.length / 2 - 1] + srt[srt.length / 2]) / 2) : null, up: v.filter(x => x > 0).length }];
   }));
 }
-// Aucune étiquette « haussier » / « baissier » : testée sans regarder le futur (2012-2025, 3 521 jours), elle n'avait aucune valeur prédictive.
-// On ne publie que des faits : pour chaque indice, moyenne, médiane et nombre d'années en hausse.
+const MIN_OBS = 5, HIT = CALC.THRESHOLDS.seasonHitRate;
+// Sens commun sur une période : 1 si les trois moyennes sont positives, −1 si négatives, 0 sinon ; « fort » si chacun a suivi ce sens au moins 60 % des années.
+function periodDir(st) {
+  const t = TAGS.map(k => st[k]);
+  if (t.some(x => x.mean == null || x.n < MIN_OBS)) return { dir: 0, strong: false, regular: false };
+  const dir = t.every(x => x.mean > 0) ? 1 : t.every(x => x.mean < 0) ? -1 : 0;
+  const share = x => (dir > 0 ? x.up : x.n - x.up) / x.n;
+  return { dir, strong: dir !== 0 && t.every(x => share(x) >= HIT), regular: dir === 0 || t.every(x => share(x) > 0.5) };
+}
+// Lecture d'ensemble des trois périodes (étiquette indicative : sa fiabilité réelle est mesurée par labelAccuracy et affichée avec elle).
+function reading(dirs) {
+  const up = dirs.filter(d => d.dir > 0).length, dn = dirs.filter(d => d.dir < 0).length, s = dirs.filter(d => d.strong).length, irr = dirs.some(d => d.dir !== 0 && !d.regular);
+  let key = 'neutral', label = 'Neutre';
+  if (up && dn) { key = 'mixed'; label = 'Mixte'; }
+  else if (up === 3) { key = s >= 2 ? 'up-strong' : 'up'; label = s >= 2 ? 'Haussier fort' : 'Haussier'; }
+  else if (dn === 3) { key = s >= 2 ? 'down-strong' : 'down'; label = s >= 2 ? 'Baissier fort' : 'Baissier'; }
+  else if (up === 2) { key = 'up-weak'; label = 'Plutôt haussier'; }
+  else if (dn === 2) { key = 'down-weak'; label = 'Plutôt baissier'; }
+  return { key, label, irregular: irr && key !== 'neutral' && key !== 'mixed' };
+}
+const labelOf = (f, day) => reading(PERIODS.map(n => periodDir(f(day, n))));
+
+// Fiabilité mesurée des étiquettes, sans regarder le futur : pour chaque jour de fromYear à toYear, l'étiquette est recalculée avec les seules années antérieures,
+// puis comparée à ce que les indices ont réellement fait ce jour-là. Renvoie, par étiquette et pour chaque indice, la part de jours en hausse et en baisse,
+// et la référence (tous les jours). series : { ES, NQ, YM } (séances [[t (s), clôture, …]]) ; caps : années maximales par indice.
+function labelAccuracy(series, caps = {}, fromYear = 2012, toYear = new Date().getUTCFullYear() - 1) {
+  const chg = {};
+  for (const tag of TAGS) { chg[tag] = new Map(); const r = series[tag] || []; for (let i = 1; i < r.length; i++) chg[tag].set(new Date(r[i][0] * 1e3).toISOString().slice(0, 10), (r[i][1] / r[i - 1][1] - 1) * 100); }
+  const mk = () => ({ n: 0, up: { ES: 0, NQ: 0, YM: 0 }, down: { ES: 0, NQ: 0, YM: 0 } }), all = mk(), by = {};
+  for (let y = fromYear; y <= toYear; y++) for (let mo = 0; mo < 12; mo++) {
+    const f = dayStats(series, y, mo, caps);
+    for (let d = 1; d <= 31; d++) {
+      const iso = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (!TAGS.every(t => chg[t].has(iso))) continue;                                      // jour sans séance sur l'un des indices
+      const key = labelOf(f, d).key, g = by[key] ||= mk();
+      for (const bucket of [all, g]) { bucket.n++; for (const t of TAGS) { const c = chg[t].get(iso); if (c > 0) bucket.up[t]++; else if (c < 0) bucket.down[t]++; } }
+    }
+  }
+  const pct = (k, n) => (n ? Math.round(k / n * 1000) / 10 : null), out = { from: fromYear, to: toYear, days: all.n, all: {}, labels: {} };
+  const fill = b => ({ n: b.n, ...Object.fromEntries(TAGS.map(t => [t, { up: pct(b.up[t], b.n), down: pct(b.down[t], b.n) }])) });
+  Object.assign(out.all, fill(all)); for (const [k, b] of Object.entries(by)) out.labels[k] = fill(b);
+  return out;
+}
 
 // Jours d'une plage de dates [start, start + count jours[. ff : calendrier Forex Factory ; auto : dates lues automatiquement ; caps : années maximales par indice.
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
@@ -158,9 +199,9 @@ function rangeDays({ start, count, series, caps = {}, ff = [], auto = null, toda
     const { stats, events, holidays } = monthData(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth());
     const d = ymd(t), w = new Date(t).getUTCDay(), dom = new Date(t).getUTCDate(), hol = holidays[d] || null;
     const open = w !== 0 && w !== 6 && !(hol && hol.kind === 'closed');
-    const per = Object.fromEntries(PERIODS.map(n => [n, stats(dom, n)]));
+    const per = Object.fromEntries(PERIODS.map(n => [n, stats(dom, n)])), lab = labelOf(stats, dom);
     days.push({ date: d, day: dom, weekday: WD[w], weekend: w === 0 || w === 6, open, holiday: hol, today: d === today,
-      season: { periods: per }, events: events[d] || [] });
+      season: { ...lab, periods: per }, events: events[d] || [] });
   }
   return days;
 }
@@ -181,4 +222,4 @@ function weekCalendar({ monday, series, caps = {}, ff = [], auto = null, today =
   return { view: 'week', year: a.getUTCFullYear(), month: a.getUTCMonth(), start: monday, label, periods: PERIODS, caps, officialUntil: knownUntil(auto), days: rangeDays({ start: monday, count: 7, series, caps, ff, auto, today }) };
 }
 
-module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, monthCalendar, weekCalendar, rangeDays, knownUntil, gdpLabel, nyDate, PERIODS };
+module.exports = { OFFICIAL, KINDS, ffKind, nyseDays, monthEvents, dayStats, labelOf, labelAccuracy, reading, periodDir, monthCalendar, weekCalendar, rangeDays, knownUntil, gdpLabel, nyDate, PERIODS };

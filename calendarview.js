@@ -26,15 +26,35 @@ function renderCalendar(data, root, nav = () => {}) {
   const canPrev = week ? weekOk(prev) : inRange(prev), canNext = week ? weekOk(next) : inRange(next);
   const isNow = week ? data.start === data.thisWeek : curMonth === (data.today || '').slice(0, 7);
 
+  // Phrase d'avertissement, avec les chiffres mesurés par le serveur (jamais écrits à la main) ; sans mesure, phrase générale.
+  const A = data.accuracy, p1 = v => (v == null ? '–' : v.toFixed(1).replace('.', ',') + ' %');
+  const aU = A && A.labels && A.labels['up-strong'], aD = A && A.labels && A.labels['down-strong'], aAll = A && A.all;
+  const warnNumbers = aU && aD && aAll
+    ? `Testé sans regarder le futur sur ${A.days.toLocaleString('fr-FR')} jours (${A.from}-${A.to}), le S&P 500 a monté ${p1(aU.ES.up)} des jours « haussier fort », ${p1(aD.ES.up)} des jours « baissier fort »${aD.ES.up > 50 ? ' (donc plus d\'une fois sur deux)' : ''} et ${p1(aAll.ES.up)} de l'ensemble des jours : ${Math.abs(aU.ES.up - aAll.ES.up) < 5 && Math.abs(aD.ES.up - aAll.ES.up) < 5 ? 'l\'étiquette ne dit presque rien du sens du jour.' : 'comparez ces écarts à ce que vous attendez d\'un signal.'}`
+    : 'Les étiquettes n\'ont pas été testées ici : ne les prenez pas pour un signal.';
   // Annonces majeures de la période affichée (faits : aucune lecture saisonnière).
   const major = data.days.filter(d => d.open && d.events.some(e => e.impact === 'high'));
   const majorLabel = d => d.events.filter(e => e.impact === 'high').map(e => e.label.replace(/ ;.*$/, '').replace(/ \(.*\)$/, '')).join(', ');
   const dayName = d => `${d.weekday} ${d.day}${week ? ' ' + monthName(d) : ''}`;
   const points = major.length ? [`Annonces de forte importance : ${major.map(d => `<b>${dayName(d)}</b> (${majorLabel(d)})`).join(', ')}.`] : [];
 
-  // Saisonnalité d'un jour : pour chaque indice, moyenne, médiane et nombre d'années en hausse sur la période choisie. Aucune étiquette de sens.
+  // Étiquette indicative du jour, TOUJOURS accompagnée de sa fiabilité réellement mesurée (rejeu sans regarder le futur, calculé par le serveur) :
+  // part des jours ainsi étiquetés où le S&P 500 a effectivement monté (étiquettes haussières) ou baissé (baissières), comparée à tous les jours.
+  const labelBlock = d => {
+    const s = d.season; if (!s.key) return '';
+    const acc = A && A.labels && A.labels[s.key], all = A && A.all, up = /^up/.test(s.key), down = /^down/.test(s.key);
+    let line = '', detail = '';
+    if (acc && all) {
+      line = up ? `S&P 500 : a monté <b>${p1(acc.ES.up)}</b> des jours ainsi étiquetés (tous les jours : ${p1(all.ES.up)}) · ${acc.n} jours`
+        : down ? `S&P 500 : a baissé <b>${p1(acc.ES.down)}</b> des jours ainsi étiquetés (tous les jours : ${p1(all.ES.down)}) · ${acc.n} jours`
+        : `Pas de lecture : le S&P 500 monte ${p1(acc.ES.up)} de ces jours (tous les jours : ${p1(all.ES.up)})`;
+      detail = ['ES', 'NQ', 'YM'].map(t => `${t} : monte ${p1(acc[t].up)}, baisse ${p1(acc[t].down)} (tous les jours : monte ${p1(all[t].up)}, baisse ${p1(all[t].down)})`).join(' · ') + ` — mesuré de ${A.from} à ${A.to}, sans regarder le futur`;
+    }
+    return `<div><span class="cal-lab">${s.label}</span>${s.irregular ? ' <small title="La moitié des années ou plus sont allées dans l\'autre sens : la moyenne est tirée par quelques séances">irrégulier</small>' : ''}</div>${line ? `<div class="cal-acc" title="${detail}">${line}</div>` : ''}`;
+  };
+  // Saisonnalité d'un jour : étiquette indicative avec sa fiabilité mesurée, puis les faits : pour chaque indice, moyenne, médiane et années en hausse.
   const season = d => !d.open ? `<small>${d.weekend ? 'week-end' : 'Bourse fermée'}</small>`
-    : `<div class="cal-fact" title="${tip(d.season)}">${['ES', 'NQ', 'YM'].map(k => { const x = d.season.periods[calPeriod][k]; return x.n ? `<div><b>${k}</b> moy. ${num(x.mean)} · méd. ${num(x.median)} · <b>${x.up}/${x.n}</b> en hausse</div>` : `<div><b>${k}</b> <small>données insuffisantes</small></div>`; }).join('')}</div>`;
+    : `${labelBlock(d)}<div class="cal-fact" title="${tip(d.season)}">${['ES', 'NQ', 'YM'].map(k => { const x = d.season.periods[calPeriod][k]; return x.n ? `<div><b>${k}</b> moy. ${num(x.mean)} · méd. ${num(x.median)} · <b>${x.up}/${x.n}</b> en hausse</div>` : `<div><b>${k}</b> <small>données insuffisantes</small></div>`; }).join('')}</div>`;
   // Réaction historique des indices à ce type d'annonce : repère court (S&P 500), détail des trois indices au survol.
   const R = (data.reactions && data.reactions.kinds) || {}, pc = v => (v == null ? '–' : v.toFixed(1).replace('.', ',')), sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + pc(Math.abs(v));
   const react = kind => { const k = R[kind], es = k && k.ES; if (!es) return '';
@@ -73,8 +93,9 @@ function renderCalendar(data, root, nav = () => {}) {
        <div class="ranges" id="calView" role="group" aria-label="Affichage"><button class="btn ${week ? '' : 'on'}" data-v="month" aria-pressed="${!week}">Mois</button><button class="btn ${week ? 'on' : ''}" data-v="week" aria-pressed="${week}">Semaine</button></div>
      </div>
    </div>
-   <div class="card cal-warn" role="note"><h2 class="sec">À lire avant d'utiliser ces chiffres</h2>
-     <p>Ce calendrier décrit le passé ; <b>il ne prédit pas le sens d'un jour</b>. Testé sans regarder le futur sur 3 521 jours (2012-2025), les jours que l'ancienne version de cette page étiquetait « haussier fort » ont monté 55,9 % du temps sur le S&amp;P 500, les jours « baissier fort » 51,1 %, contre 54,6 % pour l'ensemble des jours : aucune différence utile. Une moyenne est souvent tirée par quelques années extrêmes (2008) ; regardez la médiane et le nombre d'années en hausse, et gardez vos règles de risque.</p></div>
+   <div class="card cal-warn" role="note"><h2 class="sec">Ces étiquettes sont indicatives, pas des signaux</h2>
+     <p>Elles résument ce que les indices ont fait les années précédentes, <b>pas ce qu'ils feront</b>. ${warnNumbers}</p>
+     <p>Une moyenne est souvent tirée par quelques années extrêmes (2008) ; regardez la médiane, le nombre d'années en hausse et la fiabilité affichée sous chaque étiquette, et gardez vos règles de risque.</p></div>
    ${points.length ? `<div class="card"><h2 class="sec">${week ? 'Cette semaine-là' : 'En ' + data.label}</h2><ul class="rl-notes">${points.map(p => `<li>${p}</li>`).join('')}</ul></div>` : ''}
    ${body}
    ${reactTable()}
